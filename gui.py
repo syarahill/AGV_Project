@@ -116,7 +116,7 @@ class AGVApp(tk.Tk):
         self.hex_data_display = tk.Text(sensor_frame, height=3, width=40, font=("Arial", 8))
         self.hex_data_display.pack(fill="x", padx=5, pady=2)
 
-        ttk.Label(sensor_frame, text="Sensors:", font=("Arial", 8)).pack(anchor="w", padx=5, pady=2)
+        ttk.Label(sensor_frame, text="Sensors Layout: [1-8=RIGHT] | [9-16=LEFT]", font=("Arial", 8)).pack(anchor="w", padx=5, pady=2)
         self.sensor_canvas = tk.Canvas(sensor_frame, width=400, height=60, bg="white")
         self.sensor_canvas.pack(fill="x", padx=5, pady=2)
         self.sensor_points = []
@@ -158,12 +158,33 @@ class AGVApp(tk.Tk):
                 return  # Skip if sensor data is invalid
             self.intermediate_value.config(text=f"{median_value:.1f}")
             self.position_value_label.config(text=f"0x{position_value:04X}")
-            active_bits = [i + 1 for i in range(16) if position_value & (1 << i)]
+            
+            # FIXED: Invert the bits - sensors that detect the line have bit=0, not bit=1
+            # So we need to find bits that are 0 (inverted logic)
+            active_bits = [i + 1 for i in range(16) if not (position_value & (1 << i))]
             location = sum(active_bits) / len(active_bits) if active_bits else 0
             self.location_value.config(text=f"{int(location)}")
+            
+            # Update sensor visualization with corrected layout
             for i in range(16):
-                bit_value = (position_value >> i) & 1
-                fill = "#00AA00" if bit_value and i+1 in MIDDLE_SENSORS else "#33CC33" if bit_value else "lightgray"
+                # FIXED: Invert the bit logic for display
+                bit_value = not ((position_value >> i) & 1)  # Invert the bit
+                
+                # Color coding:
+                # Dark green for center sensors when active
+                # Light green for other active sensors
+                # Light gray for inactive sensors
+                # Add different colors for left/right sides
+                if bit_value:
+                    if i+1 in CENTER_SENSORS:
+                        fill = "#00AA00"  # Dark green for center
+                    elif i+1 in LOW_SENSORS:  # Right side (1-8)
+                        fill = "#FF6B6B"  # Light red for right side
+                    else:  # Left side (9-16) 
+                        fill = "#6BB6FF"  # Light blue for left side
+                else:
+                    fill = "lightgray"  # Inactive sensor
+                    
                 self.sensor_canvas.itemconfig(self.sensor_points[i][0], fill=fill)
         except queue.Empty:
             pass

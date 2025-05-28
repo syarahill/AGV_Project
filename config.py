@@ -1,10 +1,13 @@
 import enum
 
 # Serial ports
-WHEEL_PORT = "COM4"  # Motor controller port
-SENSOR_PORT = "COM12"  # Magnetic sensor port
+WHEEL_PORT = "COM3"  # Motor controller port
+SENSOR_PORT = "COM15"  # Magnetic sensor port
+UWB_PORT = "COM12"  # UWB module port 
+# Baudrates
 WHEEL_BAUDRATE = 115200  # Baudrate for motor controller
 SENSOR_BAUDRATE = 9600  # Baudrate for sensor
+UWB_BAUDRATE = 115200  # Baudrate for UWB module
 
 # Motor parameters
 MOTOR_ID_LEFT = 1
@@ -25,10 +28,10 @@ INNER_SENSORS = [6, 7, 8, 9, 10, 11]        # Inner sensors for fine detection
 # Physical layout: [1][2][3][4][5][6][7][8] | [9][10][11][12][13][14][15][16]
 #                      RIGHT SIDE           |           LEFT SIDE
 
-# PID constants for line following - Improved values
-INITIAL_PID_KP = 3.0      # Reduced for smoother response
-INITIAL_PID_KI = 0.1      # Increased for better steady-state
-INITIAL_PID_KD = 2.0      # Reduced to prevent oscillation
+# PID constants for line following - Your optimized values
+INITIAL_PID_KP = 2.0      # Your preferred value
+INITIAL_PID_KI = 0.0      # Your preferred value
+INITIAL_PID_KD = 0.5      # Your preferred value
 
 # Line following parameters
 SETPOINT = 8.5            # Center point between sensors 8 and 9
@@ -47,6 +50,75 @@ SENSOR_READ_RATE = 25     # Faster sensor reading at 25ms
 MIN_SENSORS_FOR_LINE = 1  # Minimum sensors needed to detect line
 MAX_SENSORS_FOR_LINE = 6  # Maximum sensors (if more, might be noise)
 
+# CORRECTED ROOM AND UWB CONFIGURATION
+# Room Specifications: 11 columns × 17 rows, 40×40cm cells
+ROOM_WIDTH = 4.4          # meters (11 columns × 0.4m)
+ROOM_HEIGHT = 6.8         # meters (17 rows × 0.4m)
+GRID_SIZE_X = 11          # columns
+GRID_SIZE_Y = 17          # rows
+CELL_SIZE = 0.4           # meters per cell (40cm)
+
+# UWB Anchor Positions (CORRECTED)
+UWB_ANCHOR_POSITIONS = {
+    0: (4.0, 0.4, 2.5),   # A0 at grid (10,1)
+    1: (4.0, 6.4, 2.5),   # A1 at grid (10,16)
+    2: (0.0, 3.2, 2.5),   # A2 at grid (0,8)
+}
+
+# UWB Height Compensation
+UWB_ANCHOR_HEIGHT = 2.5   # meters - height of anchors above ground
+UWB_AGV_HEIGHT = 0.0      # meters - AGV operates on ground level
+UWB_HEIGHT_DIFFERENCE = UWB_ANCHOR_HEIGHT - UWB_AGV_HEIGHT  # 2.5m
+
+# Navigation parameters (UPDATED for correct room size)
+TARGET_THRESHOLD = 0.15   # meters - how close to target before stopping
+ROTATION_THRESHOLD = 3.0  # degrees - rotation accuracy
+LINE_APPROACH_DISTANCE = 0.5  # meters - when to switch to line following
+UWB_UPDATE_RATE = 50      # milliseconds
+
+# Movement speeds for navigation
+NAVIGATION_MOVE_SPEED = 12  # RPM for forward movement during navigation
+NAVIGATION_TURN_SPEED = 8   # RPM for rotation during navigation
+
+# UWB Kalman Filter Parameters (from journal paper)
+UWB_KALMAN_ENABLED = True
+UWB_KALMAN_PROCESS_NOISE_X = 0.1     # Process noise for X axis (E_EST)
+UWB_KALMAN_PROCESS_NOISE_Y = 0.1     # Process noise for Y axis (E_EST)
+UWB_KALMAN_MEASUREMENT_NOISE = 0.33  # Measurement noise (E_MEA) from journal results
+UWB_KALMAN_INITIAL_ERROR_X = 1.0     # Initial estimation error X
+UWB_KALMAN_INITIAL_ERROR_Y = 1.0     # Initial estimation error Y
+
+# UWB Position Validation Parameters (UPDATED)
+UWB_MAX_VALID_X = ROOM_WIDTH         # Maximum valid X coordinate (4.4m)
+UWB_MAX_VALID_Y = ROOM_HEIGHT        # Maximum valid Y coordinate (6.8m)
+UWB_MIN_VALID_X = 0.0                # Minimum valid X coordinate
+UWB_MIN_VALID_Y = 0.0                # Minimum valid Y coordinate
+UWB_MAX_POSITION_JUMP = 2.0          # Maximum allowed position jump per update (meters)
+
+# UWB Distance Validation
+UWB_MIN_DISTANCE = 0.1     # Minimum valid distance to anchor (meters)
+UWB_MAX_DISTANCE = 25.0    # Maximum valid distance to anchor (meters)
+UWB_DISTANCE_TIMEOUT = 1.0 # Timeout for distance readings (seconds)
+
+# Trilateration Parameters
+TRILATERATION_MIN_ANCHORS = 3        # Minimum anchors needed for trilateration
+TRILATERATION_MAX_ERROR = 5.0        # Maximum trilateration calculation error
+TRILATERATION_ITERATION_LIMIT = 10   # Maximum iterations for trilateration refinement
+
+# Virtual Line Following Navigation Parameters
+VIRTUAL_LINE_CROSS_TRACK_KP = 1.5     # PID proportional gain for cross-track error
+VIRTUAL_LINE_CROSS_TRACK_KI = 0.0     # PID integral gain  
+VIRTUAL_LINE_CROSS_TRACK_KD = 0.3     # PID derivative gain
+VIRTUAL_LINE_MAX_CORRECTION = 0.6     # Maximum correction as fraction of base speed
+
+# Heading Detection Parameters
+HEADING_DETECTION_MIN_DISTANCE = 0.3  # Minimum movement to detect heading (meters)
+HEADING_DETECTION_TIMEOUT = 2.0       # Timeout for heading detection (seconds)
+HEADING_DETECTION_SPEED = 12          # Speed for heading detection movement
+
+# Grid Movement Parameters (Fallback)
+GRID_MOVEMENT_THRESHOLD = 0.2         # Distance threshold for grid-based movement
+
 # Enums for AGV states
 class AGVState(enum.Enum):
     DISCONNECTED = 0
@@ -54,4 +126,5 @@ class AGVState(enum.Enum):
     MANUAL_DRIVE = 2
     LINE_FOLLOW = 3
     ERROR = 4
-    LINE_LOST = 5  # New state for when line is lost
+    LINE_LOST = 5
+    UWB_NAVIGATION = 6  # Added for UWB navigation

@@ -4,6 +4,7 @@ import enum
 WHEEL_PORT = "COM3"  # Motor controller port
 SENSOR_PORT = "COM15"  # Magnetic sensor port
 UWB_PORT = "COM12"  # UWB module port 
+
 # Baudrates
 WHEEL_BAUDRATE = 115200  # Baudrate for motor controller
 SENSOR_BAUDRATE = 9600  # Baudrate for sensor
@@ -39,12 +40,13 @@ IDEAL_CENTER = 8.5        # Ideal center position
 MAX_CORRECTION = 15       # Maximum correction speed
 MIN_CORRECTION = 2        # Minimum correction to apply
 
-# Timing and thresholds
-LINE_LOST_TIMEOUT = 0.5   # Increased timeout
-MOVING_AVERAGE_WINDOW = 3 # Increased for smoother readings
+# OPTIMIZED Timing and thresholds for better performance
+LINE_LOST_TIMEOUT = 0.5   
+MOVING_AVERAGE_WINDOW = 3 
 SENSOR_OFFSET = 0.15      # meters
-MOTOR_UPDATE_RATE = 50    # Increased to 50ms for smoother control
-SENSOR_READ_RATE = 25     # Faster sensor reading at 25ms
+MOTOR_UPDATE_RATE = 100   # OPTIMIZED: Increased from 50ms to 100ms for smoother control
+SENSOR_READ_RATE = 50     # OPTIMIZED: Increased from 25ms to 50ms for better performance
+UWB_UPDATE_RATE = 30      # OPTIMIZED: Reduced from 50ms to 30ms for faster updates
 
 # Detection thresholds
 MIN_SENSORS_FOR_LINE = 1  # Minimum sensors needed to detect line
@@ -74,36 +76,34 @@ UWB_HEIGHT_DIFFERENCE = UWB_ANCHOR_HEIGHT - UWB_AGV_HEIGHT  # 2.5m
 TARGET_THRESHOLD = 0.15   # meters - how close to target before stopping
 ROTATION_THRESHOLD = 3.0  # degrees - rotation accuracy
 LINE_APPROACH_DISTANCE = 0.5  # meters - when to switch to line following
-UWB_UPDATE_RATE = 50      # milliseconds
 
 # Movement speeds for navigation
 NAVIGATION_MOVE_SPEED = 12  # RPM for forward movement during navigation
 NAVIGATION_TURN_SPEED = 8   # RPM for rotation during navigation
 
-# UWB Kalman Filter Parameters (from journal paper)
+# OPTIMIZED UWB Kalman Filter Parameters (simplified for performance)
 UWB_KALMAN_ENABLED = True
 UWB_KALMAN_PROCESS_NOISE_X = 0.1     # Process noise for X axis (E_EST)
 UWB_KALMAN_PROCESS_NOISE_Y = 0.1     # Process noise for Y axis (E_EST)
-UWB_KALMAN_MEASUREMENT_NOISE = 0.33  # Measurement noise (E_MEA) from journal results
+UWB_KALMAN_MEASUREMENT_NOISE = 0.2   # OPTIMIZED: Reduced from 0.33 for faster convergence
 UWB_KALMAN_INITIAL_ERROR_X = 1.0     # Initial estimation error X
 UWB_KALMAN_INITIAL_ERROR_Y = 1.0     # Initial estimation error Y
 
-# UWB Position Validation Parameters (UPDATED)
+# OPTIMIZED UWB Position Validation Parameters (simplified for speed)
 UWB_MAX_VALID_X = ROOM_WIDTH         # Maximum valid X coordinate (4.4m)
 UWB_MAX_VALID_Y = ROOM_HEIGHT        # Maximum valid Y coordinate (6.8m)
 UWB_MIN_VALID_X = 0.0                # Minimum valid X coordinate
 UWB_MIN_VALID_Y = 0.0                # Minimum valid Y coordinate
-UWB_MAX_POSITION_JUMP = 2.0          # Maximum allowed position jump per update (meters)
+UWB_MAX_POSITION_JUMP = 5.0          # OPTIMIZED: Increased tolerance from 2.0 to 5.0
 
-# UWB Distance Validation
+# OPTIMIZED UWB Distance Validation (simplified)
 UWB_MIN_DISTANCE = 0.1     # Minimum valid distance to anchor (meters)
 UWB_MAX_DISTANCE = 25.0    # Maximum valid distance to anchor (meters)
-UWB_DISTANCE_TIMEOUT = 1.0 # Timeout for distance readings (seconds)
+UWB_DISTANCE_TIMEOUT = 2.0 # OPTIMIZED: Increased timeout for better stability
 
-# Trilateration Parameters
+# Trilateration Parameters (simplified)
 TRILATERATION_MIN_ANCHORS = 3        # Minimum anchors needed for trilateration
-TRILATERATION_MAX_ERROR = 5.0        # Maximum trilateration calculation error
-TRILATERATION_ITERATION_LIMIT = 10   # Maximum iterations for trilateration refinement
+TRILATERATION_MAX_ERROR = 10.0       # OPTIMIZED: Increased tolerance from 5.0
 
 # Virtual Line Following Navigation Parameters
 VIRTUAL_LINE_CROSS_TRACK_KP = 1.5     # PID proportional gain for cross-track error
@@ -118,6 +118,15 @@ HEADING_DETECTION_SPEED = 12          # Speed for heading detection movement
 
 # Grid Movement Parameters (Fallback)
 GRID_MOVEMENT_THRESHOLD = 0.2         # Distance threshold for grid-based movement
+
+# PERFORMANCE OPTIMIZATION: GUI Update Parameters
+GUI_POSITION_UPDATE_THRESHOLD = 0.05  # Only update GUI if AGV moved 5cm
+GUI_HEAVY_UPDATE_INTERVAL = 3         # Update heavy operations every 3rd cycle
+GUI_UPDATE_RATE = 50                  # Base GUI update rate in ms
+
+# PERFORMANCE OPTIMIZATION: UWB Processing
+UWB_DATA_RATE_LIMIT = 0.02            # Minimum interval between position updates (50Hz max)
+UWB_BUFFER_SIZE = 1024                # Maximum buffer size for serial data
 
 # Enums for AGV states
 class AGVState(enum.Enum):

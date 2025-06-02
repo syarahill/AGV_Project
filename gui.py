@@ -11,42 +11,94 @@ logger = logging.getLogger("AGV_GUI")
 class AGVApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AGV with Enhanced UWB Navigation and Magnetic Guide Sensor")
-        self.geometry("1400x800")  # Increased size for diagnostics
+        self.title("AGV Control")
+        self.geometry("1400x800")
         self.controller = Controller(enable_uwb=True)
         self.command_queue = self.controller.command_queue
         self.sensor_queue = self.controller.sensor_queue
         self.is_running = False
         
-        # Grid map variables
-        self.grid_size_x = 6  # 6 cells in X
-        self.grid_size_y = 10  # 10 cells in Y  
-        self.cell_size = 40   # Smaller cells for compact display
+        # OPTIMIZED: Grid map variables
+        self.grid_size_x = GRID_SIZE_X  # 11 columns
+        self.grid_size_y = GRID_SIZE_Y  # 17 rows
+        self.cell_size = 18  # SMALLER: Reduced from 25 to 18 for compact map
         self.agv_marker = None
         self.target_marker = None
+        self.anchor_markers = {}
         self.path_lines = []
         self.grid_cells = {}
+        
+        # PERFORMANCE: GUI optimization variables
+        self.gui_update_counter = 0
+        self.last_agv_pos = (0, 0)
+        self.position_update_threshold = GUI_POSITION_UPDATE_THRESHOLD
 
         # GUI setup
         self.setup_gui()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.bind_keys()
+        
         self.start_controller()
-        self.after(30, self.update_gui)  # Faster updates: 30ms instead of 100ms
+        self.after(GUI_UPDATE_RATE, self.update_gui)  # Start optimized updates
 
     def setup_gui(self):
         main_pane = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         main_pane.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Left pane: Map and UWB Info
+        # FIXED: Left pane - simple frame without scrolling
         left_frame = ttk.Frame(main_pane)
         main_pane.add(left_frame, weight=1)
         
-        # Enhanced UWB Status Frame
-        uwb_frame = ttk.LabelFrame(left_frame, text="Enhanced UWB Real-time Status")
+        # ENHANCED: Navigation Frame with Working Navigation Button - AT TOP!
+        nav_frame = ttk.LabelFrame(left_frame, text="🎯 UWB Navigation Control")
+        nav_frame.pack(fill="x", padx=5, pady=5)
+        
+        nav_controls = ttk.Frame(nav_frame)
+        nav_controls.pack(fill="x", padx=10, pady=5)
+        
+        ttk.Label(nav_controls, text="Target X:", font=("Arial", 10, "bold")).grid(row=0, column=0, padx=5, sticky="e")
+        self.target_x_entry = ttk.Entry(nav_controls, width=10, font=("Arial", 10))
+        self.target_x_entry.grid(row=0, column=1, padx=5)
+        self.target_x_entry.insert(0, "2.0")  # Default to center
+        
+        ttk.Label(nav_controls, text="Target Y:", font=("Arial", 10, "bold")).grid(row=0, column=2, padx=5, sticky="e")
+        self.target_y_entry = ttk.Entry(nav_controls, width=10, font=("Arial", 10))
+        self.target_y_entry.grid(row=0, column=3, padx=5)
+        self.target_y_entry.insert(0, "3.4")  # Default to center
+        
+        # ENHANCED: Navigation Button - This is the button you were looking for!
+        self.navigate_btn = tk.Button(nav_controls, text="🎯 NAVIGATE TO TARGET", 
+                                     command=self.navigate_to_target,
+                                     bg="#27ae60", fg="white", font=("Arial", 12, "bold"),
+                                     width=20, height=3, relief="raised", bd=4)
+        self.navigate_btn.grid(row=0, column=4, padx=10, rowspan=2)
+        
+        # Quick navigation buttons
+        quick_nav_frame = ttk.Frame(nav_controls)
+        quick_nav_frame.grid(row=1, column=0, columnspan=4, pady=5)
+        
+        quick_positions = [
+            ("🏠 Center", 2.2, 3.4),
+            ("🔴 A0 Area", 3.8, 0.6),
+            ("🟢 A1 Area", 3.8, 6.2),
+            ("🔵 A2 Area", 0.2, 3.2)
+        ]
+        
+        for i, (text, x, y) in enumerate(quick_positions):
+            btn = tk.Button(quick_nav_frame, text=text, 
+                           command=lambda x=x, y=y: self.quick_navigate(x, y),
+                           bg="#3498db", fg="white", font=("Arial", 8), width=12)
+            btn.pack(side="left", padx=2)
+        
+        self.nav_status = tk.Label(nav_frame, text="Navigation: Ready for target", 
+                                  font=("Arial", 11, "bold"), fg="green")
+        self.nav_status.pack(pady=5)
+        
+        # OPTIMIZED: Enhanced UWB Status Frame
+        uwb_frame = ttk.LabelFrame(left_frame, text="Fast UWB Real-time Status")
         uwb_frame.pack(fill="x", padx=5, pady=5)
         
-        # Position display
+        # Position display with grid info
         pos_frame = ttk.Frame(uwb_frame)
         pos_frame.pack(fill="x", padx=5, pady=5)
         
@@ -58,15 +110,27 @@ class AGVApp(tk.Tk):
                                   font=("Arial", 12, "bold"), fg="green")
         self.grid_label.pack(side="left", padx=10)
         
+        # Room info display
+        room_info = tk.Label(pos_frame, 
+                           text=f"Room: {ROOM_WIDTH}×{ROOM_HEIGHT}m ({GRID_SIZE_X}×{GRID_SIZE_Y} grid)", 
+                           font=("Arial", 10), fg="gray")
+        room_info.pack(side="left", padx=10)
+        
         # Kalman filter status
         kalman_frame = ttk.Frame(uwb_frame)
         kalman_frame.pack(fill="x", padx=5, pady=2)
         
         self.kalman_status = tk.Label(kalman_frame, 
-                                     text=f"Kalman Filter: {'Enabled' if UWB_KALMAN_ENABLED else 'Disabled'}", 
+                                     text=f"Optimized Kalman: {'Enabled' if UWB_KALMAN_ENABLED else 'Disabled'}", 
                                      font=("Arial", 10, "bold"), 
                                      fg="green" if UWB_KALMAN_ENABLED else "red")
         self.kalman_status.pack(side="left")
+        
+        # Height compensation status
+        height_status = tk.Label(kalman_frame, 
+                               text=f"Height Comp: {UWB_HEIGHT_DIFFERENCE}m", 
+                               font=("Arial", 10), fg="purple")
+        height_status.pack(side="left", padx=20)
         
         if UWB_KALMAN_ENABLED:
             self.accuracy_label = tk.Label(kalman_frame, text="Avg Accuracy: 0.000m", 
@@ -91,67 +155,51 @@ class AGVApp(tk.Tk):
                                       bg="#e67e22", fg="white", font=("Arial", 9))
         self.reset_uwb_btn.pack(side="right", padx=5)
         
-        # Anchor distances display with enhanced info
-        anchor_frame = ttk.Frame(uwb_frame)
+        # OPTIMIZED: Anchor distances display
+        anchor_frame = ttk.LabelFrame(uwb_frame, text="Anchor Distances (3D → Ground)")
         anchor_frame.pack(fill="x", padx=5, pady=5)
         
         self.anchor_labels = {}
+        self.anchor_ground_labels = {}
         self.anchor_quality_labels = {}
+        
+        # Create anchor info based on actual positions
         anchor_info = [
-            ("Anchor 0", "red"),
-            ("Anchor 1", "green"),
-            ("Anchor 2", "blue")
+            (f"A0 @Grid(10,1)", "red", (4.0, 0.4)),
+            (f"A1 @Grid(10,16)", "green", (4.0, 6.4)),
+            (f"A2 @Grid(0,8)", "blue", (0.0, 3.2))
         ]
         
-        for i, (name, color) in enumerate(anchor_info):
+        for i, (name, color, pos) in enumerate(anchor_info):
             frame = ttk.Frame(anchor_frame)
             frame.pack(side="left", padx=10)
             
-            ttk.Label(frame, text=f"{name}:", font=("Arial", 10, "bold")).pack()
+            ttk.Label(frame, text=f"{name}:", font=("Arial", 9, "bold")).pack()
+            ttk.Label(frame, text=f"({pos[0]}, {pos[1]})", font=("Arial", 8), foreground="gray").pack()
             
-            distance_label = tk.Label(frame, text="0.00m", font=("Arial", 10), fg=color)
+            # 3D distance
+            distance_label = tk.Label(frame, text="3D: 0.00m", font=("Arial", 9), fg=color)
             distance_label.pack()
             self.anchor_labels[i] = distance_label
             
+            # Ground distance
+            ground_label = tk.Label(frame, text="2D: 0.00m", font=("Arial", 9), fg=color)
+            ground_label.pack()
+            self.anchor_ground_labels[i] = ground_label
+            
+            # Quality indicator
             quality_label = tk.Label(frame, text="●", font=("Arial", 12), fg="gray")
             quality_label.pack()
             self.anchor_quality_labels[i] = quality_label
         
-        # Map Frame
-        map_frame = ttk.LabelFrame(left_frame, text="Real-time Position Map")
-        map_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        # OPTIMIZED: Map Frame with FIXED HEIGHT so navigation doesn't get hidden
+        map_frame = ttk.LabelFrame(left_frame, text=f"Fast Real-time Position Map ({GRID_SIZE_X}×{GRID_SIZE_Y} Grid)")
+        map_frame.pack(fill="x", padx=5, pady=5)  # FIXED: Changed from fill="both", expand=True
         
         # Create grid map
         self.create_grid_map(map_frame)
-        
-        # Navigation Frame
-        nav_frame = ttk.LabelFrame(left_frame, text="Navigation Control")
-        nav_frame.pack(fill="x", padx=5, pady=5)
-        
-        nav_controls = ttk.Frame(nav_frame)
-        nav_controls.pack(fill="x", padx=10, pady=5)
-        
-        ttk.Label(nav_controls, text="Target X:", font=("Arial", 10)).grid(row=0, column=0, padx=5, sticky="e")
-        self.target_x_entry = ttk.Entry(nav_controls, width=10)
-        self.target_x_entry.grid(row=0, column=1, padx=5)
-        self.target_x_entry.insert(0, "1.8")
-        
-        ttk.Label(nav_controls, text="Target Y:", font=("Arial", 10)).grid(row=0, column=2, padx=5, sticky="e")
-        self.target_y_entry = ttk.Entry(nav_controls, width=10)
-        self.target_y_entry.grid(row=0, column=3, padx=5)
-        self.target_y_entry.insert(0, "3.0")
-        
-        self.navigate_btn = tk.Button(nav_controls, text="Navigate to Target", 
-                                     command=self.navigate_to_target,
-                                     bg="#27ae60", fg="white", font=("Arial", 10, "bold"),
-                                     width=15)
-        self.navigate_btn.grid(row=0, column=4, padx=10)
-        
-        self.nav_status = tk.Label(nav_frame, text="Navigation: Idle", 
-                                  font=("Arial", 10), fg="black")
-        self.nav_status.pack(pady=5)
 
-        # Right pane: Controls and Sensor
+        # Right pane: Controls and Sensor (keeping existing layout)
         right_frame = ttk.Frame(main_pane)
         main_pane.add(right_frame, weight=1)
 
@@ -214,34 +262,25 @@ class AGVApp(tk.Tk):
         tk.Button(pid_frame, text="Update PID", command=self.update_pid,
                   bg="#F1C40F", fg="black", font=("Arial", 9)).grid(row=0, column=6, padx=5)
 
-        # UWB Diagnostics Frame
-        diag_frame = ttk.LabelFrame(right_frame, text="UWB Positioning Diagnostics")
+        # OPTIMIZED: UWB Diagnostics Frame (simplified)
+        diag_frame = ttk.LabelFrame(right_frame, text="Fast UWB Diagnostics")
         diag_frame.pack(fill="x", padx=5, pady=5)
         
-        # Diagnostics display
+        # Simplified diagnostics display
         diag_display = ttk.Frame(diag_frame)
         diag_display.pack(fill="x", padx=5, pady=5)
         
-        # Raw vs Filtered position
-        if UWB_KALMAN_ENABLED:
-            ttk.Label(diag_display, text="Raw Position:", font=("Arial", 9)).grid(row=0, column=0, sticky="w")
-            self.raw_position_label = ttk.Label(diag_display, text="(0.000, 0.000)", font=("Arial", 9))
-            self.raw_position_label.grid(row=0, column=1, padx=5, sticky="w")
-            
-            ttk.Label(diag_display, text="Filtered Position:", font=("Arial", 9)).grid(row=1, column=0, sticky="w")
-            self.filtered_position_label = ttk.Label(diag_display, text="(0.000, 0.000)", font=("Arial", 9))
-            self.filtered_position_label.grid(row=1, column=1, padx=5, sticky="w")
+        # Performance indicator
+        ttk.Label(diag_display, text="Performance:", font=("Arial", 9, "bold")).grid(row=0, column=0, sticky="w")
+        self.performance_label = ttk.Label(diag_display, text="Optimized", font=("Arial", 9), foreground="green")
+        self.performance_label.grid(row=0, column=1, padx=5, sticky="w")
         
-        # Error counters
-        ttk.Label(diag_display, text="Position Jumps:", font=("Arial", 9)).grid(row=2, column=0, sticky="w")
-        self.jump_count_label = ttk.Label(diag_display, text="0", font=("Arial", 9))
-        self.jump_count_label.grid(row=2, column=1, padx=5, sticky="w")
-        
-        ttk.Label(diag_display, text="Trilateration Errors:", font=("Arial", 9)).grid(row=3, column=0, sticky="w")
-        self.trilat_error_label = ttk.Label(diag_display, text="0", font=("Arial", 9))
-        self.trilat_error_label.grid(row=3, column=1, padx=5, sticky="w")
+        # Update rate display
+        ttk.Label(diag_display, text="Update Rate:", font=("Arial", 9)).grid(row=1, column=0, sticky="w")
+        self.update_rate_label = ttk.Label(diag_display, text="0 Hz", font=("Arial", 9))
+        self.update_rate_label.grid(row=1, column=1, padx=5, sticky="w")
 
-        # Sensor Frame
+        # OPTIMIZED: Sensor Frame (keeping functionality)
         sensor_frame = ttk.LabelFrame(right_frame, text="Magnetic Sensor Data")
         sensor_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
@@ -294,41 +333,46 @@ class AGVApp(tk.Tk):
         logger.addHandler(self.log_handler)
 
     def create_grid_map(self, parent):
-        """Create the visual grid map"""
+        """OPTIMIZED: Create compact visual grid map"""
         map_container = tk.Frame(parent, bg='white', relief=tk.SUNKEN, bd=2)
-        map_container.pack(padx=10, pady=10)
+        map_container.pack(padx=5, pady=5)  # REMOVED: fill and expand to keep it compact
+        
+        # SMALLER: Calculate compact canvas size
+        canvas_width = self.grid_size_x * self.cell_size + 30  # Reduced margin from 40 to 30
+        canvas_height = self.grid_size_y * self.cell_size + 30  # Reduced margin from 40 to 30
         
         self.map_canvas = tk.Canvas(map_container, 
-                                   width=self.grid_size_x * self.cell_size + 40,
-                                   height=self.grid_size_y * self.cell_size + 40,
+                                   width=canvas_width,
+                                   height=canvas_height,
                                    bg='white', highlightthickness=0)
         self.map_canvas.pack()
         
-        # Draw grid
+        # Draw grid lines (optimized and compact)
         for i in range(self.grid_size_x + 1):
-            x = i * self.cell_size + 20
-            self.map_canvas.create_line(x, 20, x, self.grid_size_y * self.cell_size + 20,
+            x = i * self.cell_size + 15  # Reduced from 20 to 15
+            self.map_canvas.create_line(x, 15, x, self.grid_size_y * self.cell_size + 15,
                                        fill='#bdc3c7', width=1)
                                        
         for i in range(self.grid_size_y + 1):
-            y = i * self.cell_size + 20
-            self.map_canvas.create_line(20, y, self.grid_size_x * self.cell_size + 20, y,
+            y = i * self.cell_size + 15  # Reduced from 20 to 15
+            self.map_canvas.create_line(15, y, self.grid_size_x * self.cell_size + 15, y,
                                        fill='#bdc3c7', width=1)
         
-        # Add coordinate labels
-        for i in range(self.grid_size_x):
-            x = i * self.cell_size + self.cell_size/2 + 20
-            self.map_canvas.create_text(x, 10, text=str(i), font=("Arial", 8))
+        # Add coordinate labels (fewer labels for performance and compactness)
+        for i in range(0, self.grid_size_x, 3):  # Every 3rd label instead of 2nd
+            x = i * self.cell_size + self.cell_size/2 + 15
+            self.map_canvas.create_text(x, 8, text=str(i), font=("Arial", 7))  # Smaller font
                                        
-        for i in range(self.grid_size_y):
-            y = i * self.cell_size + self.cell_size/2 + 20
-            self.map_canvas.create_text(10, y, text=str(self.grid_size_y - 1 - i), font=("Arial", 8))
+        for i in range(0, self.grid_size_y, 3):  # Every 3rd label instead of 2nd
+            y = i * self.cell_size + self.cell_size/2 + 15
+            self.map_canvas.create_text(8, self.grid_size_y * self.cell_size - y + 15, 
+                                       text=str(i), font=("Arial", 7))  # Smaller font
         
-        # Create grid cells
+        # Create grid cells (optimized and compact)
         for x in range(self.grid_size_x):
             for y in range(self.grid_size_y):
-                x1 = x * self.cell_size + 21
-                y1 = (self.grid_size_y - 1 - y) * self.cell_size + 21
+                x1 = x * self.cell_size + 16  # Adjusted for new margin
+                y1 = (self.grid_size_y - 1 - y) * self.cell_size + 16
                 x2 = x1 + self.cell_size - 2
                 y2 = y1 + self.cell_size - 2
                 
@@ -337,8 +381,26 @@ class AGVApp(tk.Tk):
                                                        width=0)
                 self.grid_cells[(x, y)] = rect
         
+        # Create anchor markers at CORRECT positions
+        anchor_positions = [
+            (10, 1, "A0", "red"),
+            (10, 16, "A1", "green"),
+            (0, 8, "A2", "blue")
+        ]
+        
+        for grid_x, grid_y, label, color in anchor_positions:
+            canvas_x = grid_x * self.cell_size + self.cell_size/2 + 15  # Adjusted for new margin
+            canvas_y = (self.grid_size_y - 1 - grid_y) * self.cell_size + self.cell_size/2 + 15
+            
+            anchor = self.map_canvas.create_oval(canvas_x-6, canvas_y-6, canvas_x+6, canvas_y+6,  # Smaller anchors
+                                               fill=color, outline='black', width=2)
+            anchor_text = self.map_canvas.create_text(canvas_x, canvas_y-12, text=label, 
+                                                    font=("Arial", 8, "bold"), fill=color)  # Smaller font
+            
+            self.anchor_markers[label] = (anchor, anchor_text)
+        
         # Create AGV marker
-        self.agv_marker = self.map_canvas.create_oval(0, 0, 15, 15,
+        self.agv_marker = self.map_canvas.create_oval(0, 0, 12, 12,
                                                      fill='#3498db', outline='#2980b9',
                                                      width=2)
         
@@ -351,38 +413,61 @@ class AGVApp(tk.Tk):
         self.map_canvas.itemconfig(self.agv_marker, state='hidden')
         self.map_canvas.itemconfig(self.agv_direction, state='hidden')
         
-        # Mouse click event
+        # Mouse click event for easy target setting
         self.map_canvas.bind("<Button-1>", self.on_map_click)
 
-    def update_agv_position(self, x, y, heading=90):
-        """Update AGV position on the map"""
-        # Fix coordinate conversion - scale properly to room size
-        # Real room: 3.6m x 6.0m, GUI: 6 cells x 10 cells
-        scale_x = self.grid_size_x / 3.6  # cells per meter X
-        scale_y = self.grid_size_y / 6.0  # cells per meter Y
+    def real_to_canvas_coords(self, real_x, real_y):
+        """Convert real-world coordinates to canvas coordinates"""
+        grid_x = real_x / CELL_SIZE
+        grid_y = real_y / CELL_SIZE
         
-        canvas_x = (x * scale_x) * self.cell_size + 20
-        canvas_y = (self.grid_size_y - (y * scale_y)) * self.cell_size + 20
+        canvas_x = grid_x * self.cell_size + 15  # Updated for new margin
+        canvas_y = (self.grid_size_y - grid_y) * self.cell_size + 15
+        
+        return canvas_x, canvas_y
+
+    def canvas_to_real_coords(self, canvas_x, canvas_y):
+        """Convert canvas coordinates to real-world coordinates"""
+        grid_x = (canvas_x - 15) / self.cell_size  # Updated for new margin
+        grid_y = self.grid_size_y - (canvas_y - 15) / self.cell_size
+        
+        real_x = grid_x * CELL_SIZE
+        real_y = grid_y * CELL_SIZE
+        
+        return real_x, real_y
+
+    def update_agv_position(self, x, y, heading=90):
+        """OPTIMIZED: Update AGV position with movement threshold"""
+        # Only update if significant movement
+        dx = x - self.last_agv_pos[0]
+        dy = y - self.last_agv_pos[1]
+        if (dx**2 + dy**2) < self.position_update_threshold**2:
+            return  # Skip update if movement too small
+        
+        self.last_agv_pos = (x, y)
+        
+        canvas_x, canvas_y = self.real_to_canvas_coords(x, y)
         
         # Update AGV marker position
         self.map_canvas.coords(self.agv_marker,
-                              canvas_x - 7.5, canvas_y - 7.5,
-                              canvas_x + 7.5, canvas_y + 7.5)
+                              canvas_x - 6, canvas_y - 6,
+                              canvas_x + 6, canvas_y + 6)
         
-        # Update direction indicator
-        dx = 10 * math.cos(math.radians(heading))
-        dy = -10 * math.sin(math.radians(heading))
-        self.map_canvas.coords(self.agv_direction,
-                              canvas_x, canvas_y,
-                              canvas_x + dx, canvas_y + dy)
+        # Update direction indicator less frequently
+        if self.gui_update_counter % 3 == 0:  # Every 3rd update
+            dx = 10 * math.cos(math.radians(heading))
+            dy = -10 * math.sin(math.radians(heading))
+            self.map_canvas.coords(self.agv_direction,
+                                  canvas_x, canvas_y,
+                                  canvas_x + dx, canvas_y + dy)
         
         # Show AGV
         self.map_canvas.itemconfig(self.agv_marker, state='normal')
         self.map_canvas.itemconfig(self.agv_direction, state='normal')
         
-        # Fix grid cell calculation
-        grid_x = int((x / 3.6) * self.grid_size_x)  # Scale to grid size
-        grid_y = int((y / 6.0) * self.grid_size_y)  # Scale to grid size
+        # Highlight current grid cell
+        grid_x = int(x / CELL_SIZE)
+        grid_y = int(y / CELL_SIZE)
         if 0 <= grid_x < self.grid_size_x and 0 <= grid_y < self.grid_size_y:
             for coord, rect in self.grid_cells.items():
                 if coord == (grid_x, grid_y):
@@ -395,8 +480,7 @@ class AGVApp(tk.Tk):
         if self.target_marker:
             self.map_canvas.delete(self.target_marker)
         
-        canvas_x = (x / 0.6) * self.cell_size + 20
-        canvas_y = (self.grid_size_y - (y / 0.6)) * self.cell_size + 20
+        canvas_x, canvas_y = self.real_to_canvas_coords(x, y)
         
         self.target_marker = self.map_canvas.create_rectangle(
             canvas_x - 8, canvas_y - 8,
@@ -406,162 +490,102 @@ class AGVApp(tk.Tk):
 
     def on_map_click(self, event):
         """Handle click on map to set target"""
-        # Fix coordinate conversion for map clicks
-        grid_x = (event.x - 20) / self.cell_size
-        grid_y = (event.y - 20) / self.cell_size
+        real_x, real_y = self.canvas_to_real_coords(event.x, event.y)
         
-        x = (grid_x / self.grid_size_x) * 3.6  # Convert to real meters
-        y = ((self.grid_size_y - grid_y) / self.grid_size_y) * 6.0  # Convert to real meters
-        
-        # Clamp to bounds
-        x = max(0, min(3.6, x))
-        y = max(0, min(6.0, y))
+        # Clamp to room bounds
+        real_x = max(0, min(ROOM_WIDTH, real_x))
+        real_y = max(0, min(ROOM_HEIGHT, real_y))
         
         # Update target entries
         self.target_x_entry.delete(0, tk.END)
-        self.target_x_entry.insert(0, f"{x:.1f}")
+        self.target_x_entry.insert(0, f"{real_x:.1f}")
         self.target_y_entry.delete(0, tk.END)
-        self.target_y_entry.insert(0, f"{y:.1f}")
+        self.target_y_entry.insert(0, f"{real_y:.1f}")
         
         # Update target marker
-        self.update_target_position(x, y)
+        self.update_target_position(real_x, real_y)
 
     def navigate_to_target(self):
-        """Navigate to target position using UWB"""
+        """ENHANCED: Navigate to target position using fast UWB"""
         if not self.controller.uwb_enabled:
             messagebox.showwarning("UWB Not Available", 
-                                  "UWB navigation is not available. Check connection.")
+                                  "UWB navigation is not available. Check UWB connection and try again.")
             return
             
         try:
             x = float(self.target_x_entry.get())
             y = float(self.target_y_entry.get())
             
-            if not (0 <= x <= 3.6 and 0 <= y <= 6.0):
-                raise ValueError("Coordinates must be within the 3.6x6.0m area")
+            if not (0 <= x <= ROOM_WIDTH and 0 <= y <= ROOM_HEIGHT):
+                raise ValueError(f"Coordinates must be within the {ROOM_WIDTH}×{ROOM_HEIGHT}m room area")
             
+            # Update visual target
             self.update_target_position(x, y)
+            
+            # Send navigation command to controller
             self.command_queue.put(("navigate_to", (x, y)))
-            logger.info(f"Navigating to ({x:.1f}, {y:.1f}) with enhanced positioning")
+            
+            # Update UI feedback
+            self.nav_status.config(text=f"🎯 Navigating to ({x:.1f}, {y:.1f})...", fg="blue")
+            self.navigate_btn.config(text="🔄 Navigating...", bg="#e67e22")
+            
+            logger.info(f"Navigation started to ({x:.1f}, {y:.1f}) with fast positioning")
             
         except ValueError as e:
             messagebox.showerror("Invalid Input", str(e))
+
+    def quick_navigate(self, x, y):
+        """Quick navigation to preset positions"""
+        self.target_x_entry.delete(0, tk.END)
+        self.target_x_entry.insert(0, f"{x:.1f}")
+        self.target_y_entry.delete(0, tk.END)
+        self.target_y_entry.insert(0, f"{y:.1f}")
+        self.navigate_to_target()
 
     def reset_uwb_diagnostics(self):
         """Reset UWB diagnostics"""
         self.command_queue.put(("reset_uwb", None))
         logger.info("UWB diagnostics reset requested")
 
-    def bind_keys(self):
-        self.bind("<Up>", lambda e: self.on_forward())
-        self.bind("<Down>", lambda e: self.on_backward())
-        self.bind("<Left>", lambda e: self.on_left())
-        self.bind("<Right>", lambda e: self.on_right())
-        self.bind("<space>", lambda e: self.on_stop())
-
-    def start_controller(self):
-        self.is_running = True
-        self.controller.start()
-
-    def update_pid(self):
-        try:
-            kp = float(self.kp_entry.get())
-            ki = float(self.ki_entry.get())
-            kd = float(self.kd_entry.get())
-            if not (0 <= kp <= 20): raise ValueError("Kp must be between 0 and 20")
-            if not (0 <= ki <= 1): raise ValueError("Ki must be between 0 and 1")
-            if not (0 <= kd <= 20): raise ValueError("Kd must be between 0 and 20")
-            self.command_queue.put(("update_pid", (kp, ki, kd)))
-            logger.info(f"PID updated: Kp={kp}, Ki={ki}, Kd={kd}")
-        except ValueError as e:
-            messagebox.showerror("Invalid Input", str(e))
-
-    def update_gui(self):
-        # Update UWB position and enhanced diagnostics
-        if self.controller.uwb_enabled and self.controller.uwb:
-            x, y, z = self.controller.get_uwb_position()
+    def update_anchor_distances(self):
+        """OPTIMIZED: Separate method for anchor distance updates"""
+        if hasattr(self.controller.uwb, 'get_anchor_distances'):
+            distances_3d = self.controller.uwb.get_anchor_distances()
+            distances_2d = self.controller.uwb.get_anchor_distances_2d()
             
-            # Update position display
-            self.position_label.config(text=f"Position: X={x:.3f}m, Y={y:.3f}m")
-            
-            # Update grid position
-            if hasattr(self.controller.uwb, 'adj_grid'):
-                grid_x, grid_y = self.controller.uwb.adj_grid(x, y)
-                if grid_x is not None and grid_y is not None:
-                    self.grid_label.config(text=f"Grid: ({grid_x}, {grid_y})")
-            
-            # Update anchor distances with quality indicators
-            if hasattr(self.controller.uwb, 'get_anchor_distances'):
-                distances = self.controller.uwb.get_anchor_distances()
-                for i, label in self.anchor_labels.items():
-                    if i in distances:
-                        distance = distances[i]
-                        label.config(text=f"{distance:.3f}m")
-                        
-                        # Update quality indicator
-                        if UWB_MIN_DISTANCE <= distance <= UWB_MAX_DISTANCE:
-                            self.anchor_quality_labels[i].config(fg="green")
-                        else:
-                            self.anchor_quality_labels[i].config(fg="red")
+            for i, label in self.anchor_labels.items():
+                if i in distances_3d:
+                    distance_3d = distances_3d[i]
+                    distance_2d = distances_2d.get(i, 0)
+                    
+                    label.config(text=f"3D: {distance_3d:.3f}m")
+                    self.anchor_ground_labels[i].config(text=f"2D: {distance_2d:.3f}m")
+                    
+                    # Update quality indicator
+                    if 0.1 <= distance_3d <= 25.0:
+                        self.anchor_quality_labels[i].config(fg="green")
                     else:
-                        self.anchor_quality_labels[i].config(fg="gray")
-            
-            # Update UWB diagnostics
-            diagnostics = self.controller.get_uwb_diagnostics()
-            
-            # Update accuracy if Kalman is enabled
-            if UWB_KALMAN_ENABLED and hasattr(self, 'accuracy_label'):
-                avg_accuracy = diagnostics.get('average_accuracy', 0)
-                self.accuracy_label.config(text=f"Avg Accuracy: {avg_accuracy:.3f}m")
-            
-            # Update position quality
-            quality = diagnostics.get('position_quality', {})
-            if quality:
-                jump_count = quality.get('position_jump_count', 0)
-                trilat_errors = quality.get('trilateration_error_count', 0)
-                
-                # Determine overall quality
-                if jump_count > 3 or trilat_errors > 10:
-                    quality_text = "Position Quality: Poor"
-                    quality_color = "red"
-                elif jump_count > 1 or trilat_errors > 5:
-                    quality_text = "Position Quality: Fair"
-                    quality_color = "orange"
-                else:
-                    quality_text = "Position Quality: Good"
-                    quality_color = "green"
-                
-                self.position_quality_label.config(text=quality_text, fg=quality_color)
-                
-                # Update diagnostic labels
-                self.jump_count_label.config(text=str(jump_count))
-                self.trilat_error_label.config(text=str(trilat_errors))
-                
-                # Update raw vs filtered position display
-                if UWB_KALMAN_ENABLED and hasattr(self, 'raw_position_label'):
-                    raw_pos = quality.get('raw_position', (0, 0))
-                    filtered_pos = quality.get('filtered_position', (0, 0))
-                    self.raw_position_label.config(text=f"({raw_pos[0]:.3f}, {raw_pos[1]:.3f})")
-                    self.filtered_position_label.config(text=f"({filtered_pos[0]:.3f}, {filtered_pos[1]:.3f})")
-            
-            # Update counters
-            update_count = diagnostics.get('update_count', 0)
-            self.updates_label.config(text=f"Updates: {update_count}")
-            
-            # Update AGV position on map
-            if x > 0 or y > 0:  # Only update if we have valid position
-                self.update_agv_position(x, y)
-            
-            # Update navigation status
-            if self.controller.navigation:
-                nav_status = self.controller.navigation.get_status()
-                distance = nav_status['distance_to_target']
-                if distance is not None:
-                    self.nav_status.config(text=f"Navigation: {nav_status['state']} (Dist: {distance:.3f}m)")
-                else:
-                    self.nav_status.config(text=f"Navigation: {nav_status['state']}")
+                        self.anchor_quality_labels[i].config(fg="red")
+
+    def update_diagnostics(self):
+        """OPTIMIZED: Separate method for diagnostics updates"""
+        diagnostics = self.controller.get_uwb_diagnostics()
         
-        # Update sensor data
+        if UWB_KALMAN_ENABLED and hasattr(self, 'accuracy_label'):
+            avg_accuracy = diagnostics.get('average_accuracy', 0)
+            self.accuracy_label.config(text=f"Avg Accuracy: {avg_accuracy:.3f}m")
+        
+        update_count = diagnostics.get('update_count', 0)
+        self.updates_label.config(text=f"Updates: {update_count}")
+        
+        # Update rate calculation
+        if hasattr(self, 'last_update_count'):
+            rate = (update_count - self.last_update_count) * (1000 / GUI_UPDATE_RATE / GUI_HEAVY_UPDATE_INTERVAL)
+            self.update_rate_label.config(text=f"{rate:.1f} Hz")
+        self.last_update_count = update_count
+
+    def update_sensor_display(self):
+        """OPTIMIZED: Update sensor display"""
         try:
             median_value, position_value = self.sensor_queue.get_nowait()
             if median_value is not None and position_value is not None:
@@ -584,7 +608,8 @@ class AGVApp(tk.Tk):
         except queue.Empty:
             pass
 
-        # Update status
+    def update_status_display(self):
+        """OPTIMIZED: Update status display"""
         with self.controller.lock:
             self.status_var.set(f"State: {self.controller.state.name}")
             
@@ -597,12 +622,89 @@ class AGVApp(tk.Tk):
             
             self.task1_error.config(text=f"PID Error: {self.controller.pid_error:.3f}")
             
+            # Update navigation button based on state
+            if self.controller.state == AGVState.UWB_NAVIGATION:
+                self.navigate_btn.config(text="🔄 Navigating...", bg="#e67e22")
+                if self.controller.navigation:
+                    nav_status = self.controller.navigation.get_status()
+                    distance = nav_status['distance_to_target']
+                    if distance is not None:
+                        self.nav_status.config(text=f"🎯 Navigation: {nav_status['state']} (Dist: {distance:.3f}m)", fg="blue")
+                    else:
+                        self.nav_status.config(text=f"🎯 Navigation: {nav_status['state']}", fg="blue")
+            else:
+                self.navigate_btn.config(text="🎯 NAVIGATE TO TARGET", bg="#27ae60")
+                if self.controller.state == AGVState.IDLE:
+                    self.nav_status.config(text="Navigation: Ready for target", fg="green")
+                elif self.controller.state == AGVState.LINE_FOLLOW:
+                    self.nav_status.config(text="Navigation: Line following mode", fg="purple")
+            
             rpm1, cur1 = self.controller.motor_control.prev_fb_rpm[0], self.controller.motor_control.prev_fb_cur[0]
             rpm2, cur2 = self.controller.motor_control.prev_fb_rpm[1], self.controller.motor_control.prev_fb_cur[1]
             self.lbl_motor1.config(text=f"Motor 1: RPM {rpm1}, Current {cur1:.2f}A")
             self.lbl_motor2.config(text=f"Motor 2: RPM {rpm2}, Current {cur2:.2f}A")
 
-        self.after(30, self.update_gui)  # Faster updates: 30ms instead of 100ms
+    def update_gui(self):
+        """OPTIMIZED: Main GUI update with performance optimization"""
+        self.gui_update_counter += 1
+        
+        # UWB updates every cycle
+        if self.controller.uwb_enabled and self.controller.uwb:
+            x, y, z = self.controller.get_uwb_position()
+            
+            # Update position display every cycle
+            self.position_label.config(text=f"Position: X={x:.3f}m, Y={y:.3f}m")
+            
+            # Grid position every cycle
+            if hasattr(self.controller.uwb, 'adj_grid'):
+                grid_x, grid_y = self.controller.uwb.adj_grid(x, y)
+                if grid_x is not None and grid_y is not None:
+                    self.grid_label.config(text=f"Grid: ({grid_x}, {grid_y})")
+            
+            # Update map position (with movement threshold for performance)
+            if x > 0 or y > 0:
+                self.update_agv_position(x, y)
+        
+        # Heavy operations less frequently for better performance
+        if self.gui_update_counter % GUI_HEAVY_UPDATE_INTERVAL == 0:
+            self.update_anchor_distances()
+            self.update_diagnostics()
+        
+        # Sensor data every cycle
+        self.update_sensor_display()
+        
+        # Status updates every cycle
+        self.update_status_display()
+        
+        # Continue optimized updates
+        self.after(GUI_UPDATE_RATE, self.update_gui)
+
+    def bind_keys(self):
+        self.bind("<Up>", lambda e: self.on_forward())
+        self.bind("<Down>", lambda e: self.on_backward())
+        self.bind("<Left>", lambda e: self.on_left())
+        self.bind("<Right>", lambda e: self.on_right())
+        self.bind("<space>", lambda e: self.on_stop())
+        # ADDED: Keyboard shortcut for navigation
+        self.bind("<Return>", lambda e: self.navigate_to_target())  # Enter key to navigate
+        self.bind("<Control-g>", lambda e: self.navigate_to_target())  # Ctrl+G to navigate
+
+    def start_controller(self):
+        self.is_running = True
+        self.controller.start()
+
+    def update_pid(self):
+        try:
+            kp = float(self.kp_entry.get())
+            ki = float(self.ki_entry.get())
+            kd = float(self.kd_entry.get())
+            if not (0 <= kp <= 20): raise ValueError("Kp must be between 0 and 20")
+            if not (0 <= ki <= 1): raise ValueError("Ki must be between 0 and 1")
+            if not (0 <= kd <= 20): raise ValueError("Kd must be between 0 and 20")
+            self.command_queue.put(("update_pid", (kp, ki, kd)))
+            logger.info(f"PID updated: Kp={kp}, Ki={ki}, Kd={kd}")
+        except ValueError as e:
+            messagebox.showerror("Invalid Input", str(e))
 
     def on_forward(self):
         self.command_queue.put(("set_state", AGVState.MANUAL_DRIVE))

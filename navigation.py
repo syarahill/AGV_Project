@@ -16,22 +16,19 @@ class NavigationState(Enum):
     REACHED_TARGET = 5
 
 class PIDController:
-    """Simple PID controller for cross-track error correction"""
-    def __init__(self, Kp=2.0, Ki=0.0, Kd=0.5):
+    """OPTIMIZED: Fast PID controller for cross-track error correction"""
+    def __init__(self, Kp=VIRTUAL_LINE_CROSS_TRACK_KP, Ki=VIRTUAL_LINE_CROSS_TRACK_KI, Kd=VIRTUAL_LINE_CROSS_TRACK_KD):
         self.Kp = Kp
         self.Ki = Ki
         self.Kd = Kd
         self.prev_error = 0
         self.integral = 0
-        self.max_integral = 50.0
+        self.max_integral = 30.0  # Reduced for faster response
         
     def update(self, error):
         self.integral += error
-        # Prevent integral windup
-        if self.integral > self.max_integral:
-            self.integral = self.max_integral
-        elif self.integral < -self.max_integral:
-            self.integral = -self.max_integral
+        # OPTIMIZED: Faster integral windup protection
+        self.integral = max(-self.max_integral, min(self.max_integral, self.integral))
             
         derivative = error - self.prev_error
         output = (self.Kp * error) + (self.Ki * self.integral) + (self.Kd * derivative)
@@ -44,7 +41,7 @@ class PIDController:
 
 class Navigation:
     def __init__(self, uwb_reader, motor_control, sensor_reader=None):
-        """Initialize navigation system with virtual line following"""
+        """OPTIMIZED: Initialize fast navigation system"""
         self.uwb = uwb_reader
         self.motor = motor_control
         self.sensor = sensor_reader
@@ -55,31 +52,38 @@ class Navigation:
         self.target_threshold = TARGET_THRESHOLD
         self.state = NavigationState.IDLE
         
-        # Movement parameters
+        # OPTIMIZED: Movement parameters
         self.base_speed = NAVIGATION_MOVE_SPEED
         self.turn_speed = NAVIGATION_TURN_SPEED
         
-        # Heading detection
-        self.robot_heading = None  # Will be detected dynamically
+        # OPTIMIZED: Faster heading detection
+        self.robot_heading = None
         self.heading_detection_start_pos = None
         self.heading_detection_start_time = None
-        self.heading_detection_timeout = 2.0  # seconds
+        self.heading_detection_timeout = HEADING_DETECTION_TIMEOUT
         
-        # Virtual line following (like magnetic line following)
+        # OPTIMIZED: Fast virtual line following
         self.virtual_line_start = None
         self.virtual_line_end = None
-        self.cross_track_pid = PIDController(Kp=1.5, Ki=0.0, Kd=0.3)
+        self.cross_track_pid = PIDController()
         
-        # Grid-based directional control (fallback)
+        # OPTIMIZED: Simplified control
         self.use_grid_mode = False
-        
-        # Line approach distance
         self.line_approach_distance = LINE_APPROACH_DISTANCE
         
-        logger.info("Virtual line following navigation initialized")
+        # Room bounds
+        self.room_width = ROOM_WIDTH
+        self.room_height = ROOM_HEIGHT
+        
+        logger.info(f"Fast virtual line navigation initialized for {self.room_width}×{self.room_height}m room")
         
     def set_target(self, x: float, y: float):
-        """Set target position and initialize virtual line"""
+        """OPTIMIZED: Set target position with fast validation"""
+        # Quick bounds check
+        if not (0 <= x <= self.room_width and 0 <= y <= self.room_height):
+            logger.error(f"Target ({x}, {y}) is outside room bounds")
+            return False
+        
         current_pos = self.uwb.get_current_position()
         self.start_position = (current_pos[0], current_pos[1])
         self.target_position = (x, y)
@@ -94,13 +98,11 @@ class Navigation:
         self.cross_track_pid.reset()
         self.use_grid_mode = False
         
-        logger.info(f"Target set: {self.target_position}, Virtual line: {self.virtual_line_start} -> {self.virtual_line_end}")
+        logger.info(f"🎯 Target set: {self.target_position}, Virtual line: {self.virtual_line_start} -> {self.virtual_line_end}")
+        return True
         
     def detect_heading_by_movement(self) -> bool:
-        """
-        Detect robot heading by moving forward and observing position change
-        This eliminates the need for compass/IMU
-        """
+        """OPTIMIZED: Fast heading detection by movement"""
         current_pos = self.uwb.get_current_position()
         current_time = time.time()
         
@@ -110,10 +112,10 @@ class Navigation:
             self.heading_detection_start_time = current_time
             
             # Move forward to detect heading
-            self.motor.send_rpm(1, -self.base_speed)  # Left motor reverse (forward)
-            self.motor.send_rpm(2, self.base_speed)   # Right motor forward
+            self.motor.send_rpm(1, -HEADING_DETECTION_SPEED)  # Left motor reverse (forward)
+            self.motor.send_rpm(2, HEADING_DETECTION_SPEED)   # Right motor forward
             
-            logger.info(f"Starting heading detection from position: {self.heading_detection_start_pos}")
+            logger.debug(f"Starting heading detection from position: {self.heading_detection_start_pos}")
             return False
         
         # Check if we've moved enough to calculate heading
@@ -121,8 +123,8 @@ class Navigation:
         dy = current_pos[1] - self.heading_detection_start_pos[1]
         distance_moved = math.sqrt(dx**2 + dy**2)
         
-        # Need at least 30cm movement or timeout after 2 seconds
-        if distance_moved >= 0.3 or (current_time - self.heading_detection_start_time) > self.heading_detection_timeout:
+        # OPTIMIZED: Reduced distance requirement for faster detection
+        if distance_moved >= HEADING_DETECTION_MIN_DISTANCE or (current_time - self.heading_detection_start_time) > self.heading_detection_timeout:
             # Stop motors
             self.motor.send_rpm(1, 0)
             self.motor.send_rpm(2, 0)
@@ -133,7 +135,7 @@ class Navigation:
                 if self.robot_heading < 0:
                     self.robot_heading += 360
                     
-                logger.info(f"Heading detected: {self.robot_heading:.1f}° (moved {distance_moved:.2f}m)")
+                logger.info(f"🧭 Heading detected: {self.robot_heading:.1f}° (moved {distance_moved:.2f}m)")
                 return True
             else:
                 # Fallback to grid mode if can't detect heading
@@ -144,10 +146,7 @@ class Navigation:
         return False
     
     def calculate_cross_track_error(self, current_pos: Tuple[float, float]) -> float:
-        """
-        Calculate how far the robot is from the virtual line (cross-track error)
-        This is like calculating line position error in magnetic line following
-        """
+        """OPTIMIZED: Fast cross-track error calculation"""
         if not self.virtual_line_start or not self.virtual_line_end:
             return 0.0
         
@@ -156,7 +155,7 @@ class Navigation:
         line_dy = self.virtual_line_end[1] - self.virtual_line_start[1]
         line_length = math.sqrt(line_dx**2 + line_dy**2)
         
-        if line_length < 0.01:  # Very short line
+        if line_length < 0.01:
             return 0.0
         
         # Normalize line vector
@@ -168,13 +167,12 @@ class Navigation:
         pos_dy = current_pos[1] - self.virtual_line_start[1]
         
         # Cross-track error (perpendicular distance to line)
-        # Positive = right of line, Negative = left of line
         cross_track_error = (pos_dx * (-line_dy_norm)) + (pos_dy * line_dx_norm)
         
         return cross_track_error
     
     def get_distance_to_target(self) -> float:
-        """Calculate distance to target"""
+        """OPTIMIZED: Fast distance calculation"""
         if not self.target_position:
             return float('inf')
             
@@ -185,38 +183,31 @@ class Navigation:
         )
     
     def grid_based_movement(self, current_pos: Tuple[float, float]) -> bool:
-        """
-        Fallback grid-based movement (North/South/East/West only)
-        Like a simple state machine for directional movement
-        """
+        """OPTIMIZED: Fast grid-based movement fallback"""
         if not self.target_position:
             return False
         
         dx = self.target_position[0] - current_pos[0]
         dy = self.target_position[1] - current_pos[1]
         
-        # Threshold for "close enough" in each axis
-        threshold = 0.2
+        # OPTIMIZED: Simplified threshold check
+        threshold = GRID_MOVEMENT_THRESHOLD
         
         # Prioritize X movement first, then Y
         if abs(dx) > threshold:
-            if dx > 0:  # Need to go East (positive X)
+            if dx > 0:  # Go East
                 self.motor.send_rpm(1, -self.base_speed)
                 self.motor.send_rpm(2, self.base_speed)
-                logger.debug(f"Grid mode: Moving East, dx={dx:.2f}")
-            else:  # Need to go West (negative X)
+            else:  # Go West
                 self.motor.send_rpm(1, self.base_speed)
                 self.motor.send_rpm(2, -self.base_speed)
-                logger.debug(f"Grid mode: Moving West, dx={dx:.2f}")
         elif abs(dy) > threshold:
-            if dy > 0:  # Need to go North (positive Y)
+            if dy > 0:  # Go North
                 self.motor.send_rpm(1, -self.base_speed)
                 self.motor.send_rpm(2, self.base_speed)
-                logger.debug(f"Grid mode: Moving North, dy={dy:.2f}")
-            else:  # Need to go South (negative Y)
+            else:  # Go South
                 self.motor.send_rpm(1, self.base_speed)
                 self.motor.send_rpm(2, -self.base_speed)
-                logger.debug(f"Grid mode: Moving South, dy={dy:.2f}")
         else:
             # Close enough to target
             self.motor.send_rpm(1, 0)
@@ -226,32 +217,24 @@ class Navigation:
         return False
     
     def virtual_line_following(self, current_pos: Tuple[float, float]) -> bool:
-        """
-        Follow virtual line to target (like magnetic line following)
-        This is the main navigation logic
-        """
+        """OPTIMIZED: Fast virtual line following like magnetic line following"""
         # Calculate cross-track error (how far off the virtual line)
         cross_track_error = self.calculate_cross_track_error(current_pos)
         
-        # Get PID correction (like line following PID)
+        # Get fast PID correction
         correction = self.cross_track_pid.update(cross_track_error)
         
-        # Limit correction
-        max_correction = self.base_speed * 0.6  # Max 60% of base speed
+        # OPTIMIZED: Simplified correction limiting
+        max_correction = self.base_speed * VIRTUAL_LINE_MAX_CORRECTION
         correction = max(-max_correction, min(max_correction, correction))
         
-        # Apply correction to motor speeds (like line following)
-        # Positive error = robot is right of line = turn left
-        # Negative error = robot is left of line = turn right
+        # Apply correction to motor speeds
         left_speed = -self.base_speed + correction   # Left motor (negative = forward)
         right_speed = self.base_speed - correction   # Right motor (positive = forward)
         
         # Send motor commands
         self.motor.send_rpm(1, left_speed)
         self.motor.send_rpm(2, right_speed)
-        
-        logger.debug(f"Virtual line following - Cross-track error: {cross_track_error:.3f}m, "
-                    f"Correction: {correction:.2f}, Motors: L={left_speed:.1f}, R={right_speed:.1f}")
         
         # Check if close enough to target
         distance_to_target = self.get_distance_to_target()
@@ -262,43 +245,51 @@ class Navigation:
             
         return False
     
+    def check_room_bounds(self, pos: Tuple[float, float]) -> bool:
+        """OPTIMIZED: Fast bounds checking"""
+        return (0 <= pos[0] <= self.room_width and 0 <= pos[1] <= self.room_height)
+    
     def update(self, current_heading: float = None) -> NavigationState:
-        """
-        Update navigation state machine
-        Note: current_heading parameter is ignored - we detect our own heading
-        """
+        """OPTIMIZED: Fast navigation state machine update"""
         current_pos = self.uwb.get_current_position()
+        
+        # OPTIMIZED: Quick safety check
+        if not self.check_room_bounds((current_pos[0], current_pos[1])):
+            logger.warning(f"Robot outside bounds: ({current_pos[0]:.2f}, {current_pos[1]:.2f})")
+            self.motor.send_rpm(1, 0)
+            self.motor.send_rpm(2, 0)
+            return self.state
         
         if self.state == NavigationState.IDLE:
             # Waiting for target
             pass
             
         elif self.state == NavigationState.DETECTING_HEADING:
-            # Detect robot heading by movement (no compass needed)
+            # OPTIMIZED: Fast heading detection
             if self.detect_heading_by_movement():
                 self.state = NavigationState.MOVING_TO_TARGET
-                logger.info(f"Heading detection complete. Mode: {'Grid' if self.use_grid_mode else 'Virtual Line'}")
-                time.sleep(0.5)  # Brief pause before starting navigation
+                logger.info(f"🚀 Navigation started. Mode: {'Grid' if self.use_grid_mode else 'Virtual Line'}")
+                time.sleep(0.3)  # Brief pause
                 
         elif self.state == NavigationState.MOVING_TO_TARGET:
-            # Main navigation logic
+            # OPTIMIZED: Main navigation logic
             if self.use_grid_mode:
-                # Use grid-based movement (fallback)
+                # Use fast grid-based movement (fallback)
                 if self.grid_based_movement((current_pos[0], current_pos[1])):
                     self.state = NavigationState.REACHED_TARGET
             else:
-                # Use virtual line following (primary method)
+                # Use fast virtual line following (primary method)
                 if self.virtual_line_following((current_pos[0], current_pos[1])):
                     self.state = NavigationState.REACHED_TARGET
             
-            # Check if we should switch to magnetic line following
+            # OPTIMIZED: Check if we should switch to magnetic line following
             distance_to_target = self.get_distance_to_target()
             if self.sensor and distance_to_target < self.line_approach_distance:
-                # Check if magnetic line is detected
+                # Quick check if magnetic line is detected
                 try:
                     _, position_value = self.sensor.read_data()
                     if position_value and position_value != 0xFFFF:
-                        logger.info("Magnetic line detected, switching to line following")
+                        logger.info("🧲 Magnetic line detected, switching to line following")
                         self.state = NavigationState.FOLLOWING_LINE
                         self.motor.send_rpm(1, 0)
                         self.motor.send_rpm(2, 0)
@@ -308,7 +299,6 @@ class Navigation:
                 
         elif self.state == NavigationState.FOLLOWING_LINE:
             # Line following is handled by the main controller
-            # Check if we've reached the target
             distance_to_target = self.get_distance_to_target()
             if distance_to_target < self.target_threshold:
                 self.state = NavigationState.REACHED_TARGET
@@ -317,20 +307,20 @@ class Navigation:
             # Target reached, stop
             self.motor.send_rpm(1, 0)
             self.motor.send_rpm(2, 0)
-            logger.info("Navigation complete - target reached")
+            logger.info("🎯 Navigation complete - target reached successfully!")
             
         return self.state
         
     def stop(self):
-        """Emergency stop"""
+        """OPTIMIZED: Emergency stop"""
         self.motor.send_rpm(1, 0)
         self.motor.send_rpm(2, 0)
         self.state = NavigationState.IDLE
         self.cross_track_pid.reset()
-        logger.warning("Navigation stopped")
+        logger.warning("⛔ Navigation stopped")
         
     def get_status(self) -> dict:
-        """Get current navigation status"""
+        """OPTIMIZED: Get current navigation status with performance info"""
         current_pos = self.uwb.get_current_position()
         
         cross_track_error = 0.0
@@ -343,10 +333,13 @@ class Navigation:
             'target_position': self.target_position,
             'distance_to_target': self.get_distance_to_target() if self.target_position else None,
             'robot_heading': self.robot_heading,
-            'navigation_mode': 'Grid-Based' if self.use_grid_mode else 'Virtual Line Following',
+            'navigation_mode': 'Grid-Based' if self.use_grid_mode else 'Fast Virtual Line',
             'cross_track_error': cross_track_error,
             'virtual_line_start': self.virtual_line_start,
-            'virtual_line_end': self.virtual_line_end
+            'virtual_line_end': self.virtual_line_end,
+            'room_bounds': f"{self.room_width}×{self.room_height}m",
+            'within_bounds': self.check_room_bounds((current_pos[0], current_pos[1])),
+            'optimization': 'Fast Navigation Mode'
         }
         
         return status

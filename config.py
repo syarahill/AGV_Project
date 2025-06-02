@@ -105,11 +105,15 @@ UWB_DISTANCE_TIMEOUT = 2.0 # OPTIMIZED: Increased timeout for better stability
 TRILATERATION_MIN_ANCHORS = 3        # Minimum anchors needed for trilateration
 TRILATERATION_MAX_ERROR = 10.0       # OPTIMIZED: Increased tolerance from 5.0
 
-# Virtual Line Following Navigation Parameters
-VIRTUAL_LINE_CROSS_TRACK_KP = 1.5     # PID proportional gain for cross-track error
-VIRTUAL_LINE_CROSS_TRACK_KI = 0.0     # PID integral gain  
-VIRTUAL_LINE_CROSS_TRACK_KD = 0.3     # PID derivative gain
-VIRTUAL_LINE_MAX_CORRECTION = 0.6     # Maximum correction as fraction of base speed
+# NEW: Grid Navigation Parameters
+GRID_MOVEMENT_SPEED = 15     # RPM for grid movement
+GRID_TURN_SPEED = 10         # RPM for turning
+GRID_POSITION_THRESHOLD = 0.25  # Grid position accuracy (meters)
+GRID_TURN_TIMEOUT = 3.0      # Maximum time for a turn (seconds)
+GRID_MOVE_TIMEOUT = 10.0     # Maximum time for a move (seconds)
+
+# NEW: Task 1 Parameters  
+TASK1_TARGET_GRID = (6, 10)  # Target grid position for Task 1
 
 # Heading Detection Parameters
 HEADING_DETECTION_MIN_DISTANCE = 0.3  # Minimum movement to detect heading (meters)
@@ -137,3 +141,4 @@ class AGVState(enum.Enum):
     ERROR = 4
     LINE_LOST = 5
     UWB_NAVIGATION = 6  # Added for UWB navigation
+    TASK1_NAVIGATION = 7  # NEW: Added for Task 1

@@ -25,7 +25,7 @@ class AGVApp(tk.Tk):
         self.agv_marker = None
         self.target_marker = None
         self.anchor_markers = {}
-        self.path_lines = []
+        self.path_lines = []  # For path visualization
         self.grid_cells = {}
         
         # PERFORMANCE: GUI optimization variables
@@ -223,9 +223,10 @@ class AGVApp(tk.Tk):
                  variable=self.speed_var, length=200).pack(pady=5)
 
         # Task Frame
-        task_frame = ttk.LabelFrame(right_frame, text="Line Following Task")
+        task_frame = ttk.LabelFrame(right_frame, text="Tasks")
         task_frame.pack(fill="x", padx=5, pady=5)
         
+        # Line Following Task
         self.task1_btn = tk.Button(task_frame, text="Start Line Following", 
                                   command=self.start_task1,
                                   bg="#1ABC9C", fg="white", font=("Arial", 10, "bold"),
@@ -239,6 +240,20 @@ class AGVApp(tk.Tk):
         self.task1_error = tk.Label(task_frame, text="PID Error: 0.00", 
                                    font=("Arial", 10))
         self.task1_error.pack(pady=2)
+
+        # NEW: Task 1 - Navigation to Grid (6,10)
+        separator = ttk.Separator(task_frame, orient='horizontal')
+        separator.pack(fill='x', pady=10)
+        
+        self.task1_nav_btn = tk.Button(task_frame, text="🎯 Start Task 1 (Go to Grid 6,10)", 
+                                      command=self.start_task1_navigation,
+                                      bg="#9b59b6", fg="white", font=("Arial", 10, "bold"),
+                                      width=25, height=2)
+        self.task1_nav_btn.pack(pady=5)
+
+        self.task1_nav_status = tk.Label(task_frame, text="Task 1: Ready", 
+                                        font=("Arial", 10))
+        self.task1_nav_status.pack(pady=2)
 
         # PID settings
         pid_frame = ttk.Frame(task_frame)
@@ -333,13 +348,13 @@ class AGVApp(tk.Tk):
         logger.addHandler(self.log_handler)
 
     def create_grid_map(self, parent):
-        """OPTIMIZED: Create compact visual grid map"""
+        """OPTIMIZED: Create compact visual grid map (ORIGINAL COORDINATES - CORRECT)"""
         map_container = tk.Frame(parent, bg='white', relief=tk.SUNKEN, bd=2)
-        map_container.pack(padx=5, pady=5)  # REMOVED: fill and expand to keep it compact
+        map_container.pack(padx=5, pady=5)
         
         # SMALLER: Calculate compact canvas size
-        canvas_width = self.grid_size_x * self.cell_size + 30  # Reduced margin from 40 to 30
-        canvas_height = self.grid_size_y * self.cell_size + 30  # Reduced margin from 40 to 30
+        canvas_width = self.grid_size_x * self.cell_size + 30
+        canvas_height = self.grid_size_y * self.cell_size + 30
         
         self.map_canvas = tk.Canvas(map_container, 
                                    width=canvas_width,
@@ -347,32 +362,32 @@ class AGVApp(tk.Tk):
                                    bg='white', highlightthickness=0)
         self.map_canvas.pack()
         
-        # Draw grid lines (optimized and compact)
+        # Draw grid lines
         for i in range(self.grid_size_x + 1):
-            x = i * self.cell_size + 15  # Reduced from 20 to 15
+            x = i * self.cell_size + 15
             self.map_canvas.create_line(x, 15, x, self.grid_size_y * self.cell_size + 15,
                                        fill='#bdc3c7', width=1)
                                        
         for i in range(self.grid_size_y + 1):
-            y = i * self.cell_size + 15  # Reduced from 20 to 15
+            y = i * self.cell_size + 15
             self.map_canvas.create_line(15, y, self.grid_size_x * self.cell_size + 15, y,
                                        fill='#bdc3c7', width=1)
         
-        # Add coordinate labels (fewer labels for performance and compactness)
-        for i in range(0, self.grid_size_x, 3):  # Every 3rd label instead of 2nd
+        # Add coordinate labels (ORIGINAL WITH Y FLIP - CORRECT)
+        for i in range(0, self.grid_size_x, 3):
             x = i * self.cell_size + self.cell_size/2 + 15
-            self.map_canvas.create_text(x, 8, text=str(i), font=("Arial", 7))  # Smaller font
+            self.map_canvas.create_text(x, 8, text=str(i), font=("Arial", 7))
                                        
-        for i in range(0, self.grid_size_y, 3):  # Every 3rd label instead of 2nd
+        for i in range(0, self.grid_size_y, 3):
             y = i * self.cell_size + self.cell_size/2 + 15
             self.map_canvas.create_text(8, self.grid_size_y * self.cell_size - y + 15, 
-                                       text=str(i), font=("Arial", 7))  # Smaller font
+                                       text=str(i), font=("Arial", 7))  # ORIGINAL: Y flip
         
-        # Create grid cells (optimized and compact)
+        # Create grid cells (ORIGINAL WITH Y FLIP - CORRECT)
         for x in range(self.grid_size_x):
             for y in range(self.grid_size_y):
-                x1 = x * self.cell_size + 16  # Adjusted for new margin
-                y1 = (self.grid_size_y - 1 - y) * self.cell_size + 16
+                x1 = x * self.cell_size + 16
+                y1 = (self.grid_size_y - 1 - y) * self.cell_size + 16  # ORIGINAL: Y flip
                 x2 = x1 + self.cell_size - 2
                 y2 = y1 + self.cell_size - 2
                 
@@ -381,7 +396,7 @@ class AGVApp(tk.Tk):
                                                        width=0)
                 self.grid_cells[(x, y)] = rect
         
-        # Create anchor markers at CORRECT positions
+        # Create anchor markers at CORRECT positions (ORIGINAL WITH Y FLIP - CORRECT)
         anchor_positions = [
             (10, 1, "A0", "red"),
             (10, 16, "A1", "green"),
@@ -389,15 +404,29 @@ class AGVApp(tk.Tk):
         ]
         
         for grid_x, grid_y, label, color in anchor_positions:
-            canvas_x = grid_x * self.cell_size + self.cell_size/2 + 15  # Adjusted for new margin
-            canvas_y = (self.grid_size_y - 1 - grid_y) * self.cell_size + self.cell_size/2 + 15
+            canvas_x = grid_x * self.cell_size + self.cell_size/2 + 15
+            canvas_y = (self.grid_size_y - 1 - grid_y) * self.cell_size + self.cell_size/2 + 15  # ORIGINAL: Y flip
             
-            anchor = self.map_canvas.create_oval(canvas_x-6, canvas_y-6, canvas_x+6, canvas_y+6,  # Smaller anchors
+            anchor = self.map_canvas.create_oval(canvas_x-6, canvas_y-6, canvas_x+6, canvas_y+6,
                                                fill=color, outline='black', width=2)
             anchor_text = self.map_canvas.create_text(canvas_x, canvas_y-12, text=label, 
-                                                    font=("Arial", 8, "bold"), fill=color)  # Smaller font
+                                                    font=("Arial", 8, "bold"), fill=color)
             
             self.anchor_markers[label] = (anchor, anchor_text)
+        
+        # Highlight target grid (6,10) for Task 1 (ORIGINAL WITH Y FLIP - CORRECT)
+        target_grid_x, target_grid_y = TASK1_TARGET_GRID
+        if 0 <= target_grid_x < self.grid_size_x and 0 <= target_grid_y < self.grid_size_y:
+            canvas_x = target_grid_x * self.cell_size + self.cell_size/2 + 15
+            canvas_y = (self.grid_size_y - 1 - target_grid_y) * self.cell_size + self.cell_size/2 + 15  # ORIGINAL: Y flip
+            
+            target_marker = self.map_canvas.create_rectangle(
+                canvas_x - 8, canvas_y - 8, canvas_x + 8, canvas_y + 8,
+                fill='#8e44ad', outline='#9b59b6', width=2
+            )
+            target_text = self.map_canvas.create_text(canvas_x, canvas_y + 15, 
+                                                    text="Task1", font=("Arial", 8, "bold"), 
+                                                    fill='#8e44ad')
         
         # Create AGV marker
         self.agv_marker = self.map_canvas.create_oval(0, 0, 12, 12,
@@ -417,27 +446,56 @@ class AGVApp(tk.Tk):
         self.map_canvas.bind("<Button-1>", self.on_map_click)
 
     def real_to_canvas_coords(self, real_x, real_y):
-        """Convert real-world coordinates to canvas coordinates"""
+        """Convert real-world coordinates to canvas coordinates (ORIGINAL WITH Y FLIP - CORRECT for map elements)"""
         grid_x = real_x / CELL_SIZE
         grid_y = real_y / CELL_SIZE
         
-        canvas_x = grid_x * self.cell_size + 15  # Updated for new margin
-        canvas_y = (self.grid_size_y - grid_y) * self.cell_size + 15
+        canvas_x = grid_x * self.cell_size + 15
+        canvas_y = (self.grid_size_y - grid_y) * self.cell_size + 15  # ORIGINAL: Y flip
+        
+        return canvas_x, canvas_y
+
+    def agv_real_to_canvas_coords(self, real_x, real_y):
+        """FIXED: Convert AGV real-world coordinates to canvas coordinates (NO Y FLIP for AGV)"""
+        grid_x = real_x / CELL_SIZE
+        grid_y = real_y / CELL_SIZE
+        
+        canvas_x = grid_x * self.cell_size + 15
+        canvas_y = grid_y * self.cell_size + 15  # NO Y FLIP for AGV position
         
         return canvas_x, canvas_y
 
     def canvas_to_real_coords(self, canvas_x, canvas_y):
-        """Convert canvas coordinates to real-world coordinates"""
-        grid_x = (canvas_x - 15) / self.cell_size  # Updated for new margin
-        grid_y = self.grid_size_y - (canvas_y - 15) / self.cell_size
+        """Convert canvas coordinates to real-world coordinates (ORIGINAL WITH Y FLIP - CORRECT)"""
+        grid_x = (canvas_x - 15) / self.cell_size
+        grid_y = self.grid_size_y - (canvas_y - 15) / self.cell_size  # ORIGINAL: Y flip
         
         real_x = grid_x * CELL_SIZE
         real_y = grid_y * CELL_SIZE
         
         return real_x, real_y
 
+    def draw_planned_path(self, path_lines):
+        """Draw planned path as green lines on map"""
+        # Clear previous path lines
+        for line in getattr(self, 'path_lines', []):
+            self.map_canvas.delete(line)
+        self.path_lines = []
+        
+        # Draw new path lines using AGV coordinate system (no Y flip)
+        for from_pos, to_pos in path_lines:
+            from_canvas = self.agv_real_to_canvas_coords(from_pos[0], from_pos[1])
+            to_canvas = self.agv_real_to_canvas_coords(to_pos[0], to_pos[1])
+            
+            line = self.map_canvas.create_line(
+                from_canvas[0], from_canvas[1],
+                to_canvas[0], to_canvas[1],
+                fill='#27ae60', width=3, tags='path'
+            )
+            self.path_lines.append(line)
+
     def update_agv_position(self, x, y, heading=90):
-        """OPTIMIZED: Update AGV position with movement threshold"""
+        """FIXED: Update AGV position with correct coordinates (NO Y FLIP for AGV)"""
         # Only update if significant movement
         dx = x - self.last_agv_pos[0]
         dy = y - self.last_agv_pos[1]
@@ -446,7 +504,8 @@ class AGVApp(tk.Tk):
         
         self.last_agv_pos = (x, y)
         
-        canvas_x, canvas_y = self.real_to_canvas_coords(x, y)
+        # FIXED: Use AGV-specific coordinate conversion (no Y flip)
+        canvas_x, canvas_y = self.agv_real_to_canvas_coords(x, y)
         
         # Update AGV marker position
         self.map_canvas.coords(self.agv_marker,
@@ -465,7 +524,7 @@ class AGVApp(tk.Tk):
         self.map_canvas.itemconfig(self.agv_marker, state='normal')
         self.map_canvas.itemconfig(self.agv_direction, state='normal')
         
-        # Highlight current grid cell
+        # FIXED: Highlight current grid cell with correct coordinates (no Y flip)
         grid_x = int(x / CELL_SIZE)
         grid_y = int(y / CELL_SIZE)
         if 0 <= grid_x < self.grid_size_x and 0 <= grid_y < self.grid_size_y:
@@ -541,6 +600,16 @@ class AGVApp(tk.Tk):
         self.target_y_entry.delete(0, tk.END)
         self.target_y_entry.insert(0, f"{y:.1f}")
         self.navigate_to_target()
+
+    def start_task1_navigation(self):
+        """Start Task 1 - Navigate to grid (6,10)"""
+        if not self.controller.uwb_enabled:
+            messagebox.showwarning("UWB Not Available", 
+                                  "UWB navigation is required for Task 1. Check UWB connection.")
+            return
+        
+        self.command_queue.put(("start_task1", None))
+        logger.info("Task 1 navigation started")
 
     def reset_uwb_diagnostics(self):
         """Reset UWB diagnostics"""
@@ -622,12 +691,30 @@ class AGVApp(tk.Tk):
             
             self.task1_error.config(text=f"PID Error: {self.controller.pid_error:.3f}")
             
+            # Update Task 1 Navigation status
+            if self.controller.state == AGVState.TASK1_NAVIGATION:
+                self.task1_nav_btn.config(text="🔄 Task 1 Running...", bg="#e67e22")
+                if self.controller.navigation:
+                    nav_status = self.controller.navigation.get_status()
+                    progress = nav_status.get('progress', '0/0')
+                    current_step = nav_status.get('current_step', 'None')
+                    self.task1_nav_status.config(text=f"Task 1: {progress} - {current_step}")
+                    
+                    # Draw path visualization
+                    path_lines = nav_status.get('path_visualization', [])
+                    if path_lines:
+                        self.draw_planned_path(path_lines)
+            else:
+                self.task1_nav_btn.config(text="🎯 Start Task 1 (Go to Grid 6,10)", bg="#9b59b6")
+                if self.controller.state == AGVState.IDLE:
+                    self.task1_nav_status.config(text="Task 1: Ready")
+            
             # Update navigation button based on state
             if self.controller.state == AGVState.UWB_NAVIGATION:
                 self.navigate_btn.config(text="🔄 Navigating...", bg="#e67e22")
                 if self.controller.navigation:
                     nav_status = self.controller.navigation.get_status()
-                    distance = nav_status['distance_to_target']
+                    distance = nav_status.get('distance_to_target')
                     if distance is not None:
                         self.nav_status.config(text=f"🎯 Navigation: {nav_status['state']} (Dist: {distance:.3f}m)", fg="blue")
                     else:

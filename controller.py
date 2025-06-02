@@ -10,11 +10,11 @@ from motor_control import MotorControl
 # Try to import UWB modules, but continue if they don't exist yet
 try:
     from uwb_reader import UWBReader
-    from navigation import Navigation, NavigationState
+    from navigation import PathNavigation, NavigationState
 except ImportError as e:
     logging.warning("UWB modules not found - continuing without UWB support")
     UWBReader = None
-    Navigation = None
+    PathNavigation = None
     NavigationState = None
 
 logger = logging.getLogger("Controller")
@@ -66,20 +66,12 @@ class Controller:
         self.navigation = None
         self.uwb_enabled = enable_uwb
         
-        if enable_uwb and UWBReader and Navigation:
+        if enable_uwb and UWBReader and PathNavigation:
             try:
                 self.uwb = UWBReader(UWB_PORT)
                 if self.uwb.connect():
-                    self.navigation = Navigation(self.uwb, self.motor_control, self.sensor)
-                    logger.info("Fast UWB navigation initialized with optimized positioning")
-                    
-                    # Log UWB configuration
-                    if UWB_KALMAN_ENABLED:
-                        logger.info(f"Optimized Kalman filtering enabled - Process noise: X={UWB_KALMAN_PROCESS_NOISE_X}, "
-                                  f"Y={UWB_KALMAN_PROCESS_NOISE_Y}, Measurement noise: {UWB_KALMAN_MEASUREMENT_NOISE}")
-                    else:
-                        logger.info("Kalman filtering disabled")
-                        
+                    self.navigation = PathNavigation(self.uwb, self.motor_control)
+                    logger.info("Path navigation initialized")
                 else:
                     logger.warning("Failed to initialize UWB navigation - continuing without UWB")
                     self.uwb_enabled = False
@@ -242,7 +234,7 @@ class Controller:
             time.sleep(2)  # OPTIMIZED: Check every 2 seconds instead of 1
 
     def navigate_to_position(self, x: float, y: float):
-        """ENHANCED: Navigate to a specific position using fast UWB"""
+        """ENHANCED: Navigate to a specific position using UWB"""
         if not self.navigation:
             logger.error("UWB navigation not available")
             return False
@@ -252,10 +244,29 @@ class Controller:
             logger.error(f"Target ({x}, {y}) outside room bounds")
             return False
             
-        self.navigation.set_target(x, y)
-        self.state = AGVState.UWB_NAVIGATION
-        logger.info(f"Starting fast navigation to ({x:.1f}, {y:.1f})")
-        return True
+        # Convert to grid coordinates
+        grid_x = int(x / CELL_SIZE)
+        grid_y = int(y / CELL_SIZE)
+        
+        if self.navigation.set_target_grid(grid_x, grid_y):
+            self.state = AGVState.UWB_NAVIGATION
+            logger.info(f"Starting path navigation to grid ({grid_x}, {grid_y})")
+            return True
+        return False
+
+    def start_task1(self):
+        """NEW: Start Task 1 - Move to grid position (6,10)"""
+        if not self.navigation:
+            logger.error("Navigation not available for Task 1")
+            return False
+        
+        target_x, target_y = TASK1_TARGET_GRID
+        
+        if self.navigation.set_target_grid(target_x, target_y):
+            self.state = AGVState.TASK1_NAVIGATION
+            logger.info(f"🎯 Task 1 started: Moving to grid ({target_x}, {target_y})")
+            return True
+        return False
 
     def get_uwb_position(self) -> tuple:
         """Get current UWB position"""
@@ -358,6 +369,8 @@ class Controller:
                     elif cmd[0] == "navigate_to":
                         x, y = cmd[1]
                         self.navigate_to_position(x, y)
+                    elif cmd[0] == "start_task1":
+                        self.start_task1()
                     elif cmd[0] == "reset_uwb":
                         self.reset_uwb_diagnostics()
             except queue.Empty:
@@ -374,20 +387,17 @@ class Controller:
             last_motor_update = current_time
 
             try:
-                # ENHANCED: UWB Navigation logic with proper navigation handling
-                if self.state == AGVState.UWB_NAVIGATION and self.navigation:
-                    # FIXED: Remove hardcoded heading - let navigation detect it
+                # ENHANCED: Path Navigation logic for UWB and Task 1
+                if self.state in [AGVState.UWB_NAVIGATION, AGVState.TASK1_NAVIGATION] and self.navigation:
                     nav_state = self.navigation.update()
                     
-                    # Switch to line following when navigation requests it
-                    if nav_state == NavigationState.FOLLOWING_LINE:
-                        self.state = AGVState.LINE_FOLLOW
-                        self.pid.reset()
-                        logger.info("Switched from UWB navigation to line following")
-                    elif nav_state == NavigationState.REACHED_TARGET:
+                    if nav_state == NavigationState.REACHED_TARGET:
                         self.state = AGVState.IDLE
                         self.desired_rpm = [0, 0]
-                        logger.info("🎯 Target reached successfully!")
+                        if self.state == AGVState.TASK1_NAVIGATION:
+                            logger.info("🎯 Task 1 completed successfully!")
+                        else:
+                            logger.info("🎯 Navigation target reached!")
 
                 # OPTIMIZED: Line following logic
                 elif self.state == AGVState.LINE_FOLLOW:

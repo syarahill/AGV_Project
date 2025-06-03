@@ -1,3 +1,8 @@
+# =============================================================================
+# UWB READER - FROM NEW CODE (EXACT PRESERVATION)
+# This file preserves the proven UWB positioning system from new code
+# =============================================================================
+
 import serial
 import logging
 import threading

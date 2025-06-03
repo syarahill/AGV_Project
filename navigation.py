@@ -1,3 +1,8 @@
+# =============================================================================
+# NAVIGATION - FROM NEW CODE (EXACT PRESERVATION)
+# This file preserves the proven grid navigation system from new code
+# =============================================================================
+
 import math
 import logging
 import time

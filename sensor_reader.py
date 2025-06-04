@@ -1,8 +1,3 @@
-# =============================================================================
-# SENSOR READER - FROM OLD CODE (EXACT PRESERVATION)
-# This file preserves the reliable, proven sensor communication from old code
-# =============================================================================
-
 import logging
 from pymodbus.client import ModbusSerialClient
 from config import SENSOR_PORT, SENSOR_BAUDRATE, SENSOR_ADDRESS
@@ -11,7 +6,6 @@ logger = logging.getLogger("SensorReader")
 
 class SensorReader:
     def __init__(self):
-        """Initialize sensor reader - FROM OLD CODE (EXACT PRESERVATION)"""
         self.client = ModbusSerialClient(
             port=SENSOR_PORT,
             baudrate=SENSOR_BAUDRATE,
@@ -26,7 +20,7 @@ class SensorReader:
         self.max_consecutive_errors = 5
 
     def connect(self):
-        """Connect to the magnetic sensor - FROM OLD CODE (EXACT PRESERVATION)"""
+        """Connect to the magnetic sensor"""
         try:
             self.is_connected = self.client.connect()
             if self.is_connected:
@@ -41,7 +35,7 @@ class SensorReader:
             return False
 
     def read_data(self):
-        """Read sensor data via Modbus - FROM OLD CODE (EXACT PRESERVATION)"""
+        """Read sensor data via Modbus"""
         if not self.is_connected:
             logger.debug("Sensor not connected, attempting to reconnect...")
             if not self.connect():
@@ -91,7 +85,7 @@ class SensorReader:
             return None, None
 
     def close(self):
-        """Close sensor connection - FROM OLD CODE (EXACT PRESERVATION)"""
+        """Close sensor connection"""
         if self.is_connected:
             try:
                 self.client.close()
@@ -101,7 +95,7 @@ class SensorReader:
                 logger.error(f"Error closing sensor connection: {e}")
 
     def test_connection(self):
-        """Test if sensor is responding - FROM OLD CODE (EXACT PRESERVATION)"""
+        """Test if sensor is responding"""
         if not self.is_connected:
             return False
             

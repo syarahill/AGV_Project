@@ -1,8 +1,3 @@
-# =============================================================================
-# UWB READER - FROM NEW CODE (EXACT PRESERVATION)
-# This file preserves the proven UWB positioning system from new code
-# =============================================================================
-
 import serial
 import logging
 import threading
@@ -87,7 +82,7 @@ class UWBReader:
         self.Ax2, self.Ay2 = anchor_positions[2][0], anchor_positions[2][1]
         
         # Current position and distances
-        self.posisi_t = (0, 0)
+        self.posisi_t = (0, 0, 0)  # Ensure 3 values for consistency
         self.posisi_t_raw = (0, 0)
         self.posisi_t_filtered = (0, 0)
         self.anchor_distances = {0: 0.0, 1: 0.0, 2: 0.0}
@@ -280,9 +275,9 @@ class UWBReader:
             # OPTIMIZED: Apply Kalman filtering if enabled
             if self.kalman_filter and UWB_KALMAN_ENABLED:
                 self.posisi_t_filtered = self.kalman_filter.update(posisi_raw[0], posisi_raw[1])
-                self.posisi_t = self.posisi_t_filtered
+                self.posisi_t = (self.posisi_t_filtered[0], self.posisi_t_filtered[1], 0.0)
             else:
-                self.posisi_t = posisi_raw
+                self.posisi_t = (posisi_raw[0], posisi_raw[1], 0.0)
     
     def get_anchor_distances(self) -> Dict[int, float]:
         """Get current 3D distances to all anchors"""
@@ -297,14 +292,12 @@ class UWBReader:
     def read_position(self) -> Optional[Tuple[float, float, float]]:
         """Read current position from UWB"""
         with self.position_lock:
-            x, y = self.posisi_t
-            return (x, y, 0.0)
+            return self.posisi_t
     
     def get_current_position(self) -> Tuple[float, float, float]:
         """Get the last known position"""
         with self.position_lock:
-            x, y = self.posisi_t
-            return (x, y, 0.0)
+            return self.posisi_t
     
     def get_position_quality(self) -> Dict:
         """OPTIMIZED: Simplified position quality metrics"""

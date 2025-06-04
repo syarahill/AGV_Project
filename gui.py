@@ -11,27 +11,29 @@ logger = logging.getLogger("AGV_GUI")
 class AGVApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AGV Control - Unified System")
-        self.geometry("1800x900")  # FIXED: Optimized for 1920x1080 screen
+        self.title("AGV Control")
+        self.geometry("1400x800")
         self.controller = Controller(enable_uwb=True)
         self.command_queue = self.controller.command_queue
         self.sensor_queue = self.controller.sensor_queue
         self.is_running = False
         
-        # Grid map variables - PRESERVED: Keep exact same map functionality
+        # OPTIMIZED: Grid map variables
         self.grid_size_x = GRID_SIZE_X  # 11 columns
         self.grid_size_y = GRID_SIZE_Y  # 17 rows
-        self.cell_size = 18  # PRESERVED: Same compact map size
+        self.cell_size = 18  # SMALLER: Reduced from 25 to 18 for compact map
         self.agv_marker = None
         self.target_marker = None
         self.anchor_markers = {}
         self.path_lines = []  # For path visualization
         self.grid_cells = {}
         
-        # Performance optimization variables - PRESERVED
+        # PERFORMANCE: GUI optimization variables
         self.gui_update_counter = 0
         self.last_agv_pos = (0, 0)
-        self.position_update_threshold = 0.05  # GUI_POSITION_UPDATE_THRESHOLD
+        self.position_update_threshold = GUI_POSITION_UPDATE_THRESHOLD
+        self.agv_heading = 0  # Track AGV heading for direction arrow
+        self.last_uwb_pos = (0, 0)  # Store last position for heading calculation
 
         # GUI setup
         self.setup_gui()
@@ -39,303 +41,320 @@ class AGVApp(tk.Tk):
         self.bind_keys()
         
         self.start_controller()
-        self.after(50, self.update_gui)  # Start updates
+        self.after(GUI_UPDATE_RATE, self.update_gui)  # Start optimized updates
 
     def setup_gui(self):
         main_pane = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
-        main_pane.pack(fill="both", expand=True, padx=3, pady=3)  # FIXED: Reduced padding
+        main_pane.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Left pane
+        # FIXED: Left pane - simple frame without scrolling
         left_frame = ttk.Frame(main_pane)
         main_pane.add(left_frame, weight=1)
         
-        # =============================================================================
-        # NAVIGATION FRAME - FIXED: Smaller buttons for 1920x1080
-        # =============================================================================
+        # ENHANCED: Navigation Frame with Working Navigation Button - AT TOP!
         nav_frame = ttk.LabelFrame(left_frame, text="🎯 UWB Navigation Control")
-        nav_frame.pack(fill="x", padx=3, pady=2)  # FIXED: Reduced padding
+        nav_frame.pack(fill="x", padx=5, pady=5)
         
         nav_controls = ttk.Frame(nav_frame)
-        nav_controls.pack(fill="x", padx=5, pady=3)  # FIXED: Reduced padding
+        nav_controls.pack(fill="x", padx=10, pady=5)
         
-        # Target input - FIXED: Smaller components
-        ttk.Label(nav_controls, text="Target X:", font=("Arial", 9)).grid(row=0, column=0, padx=3, sticky="e")
-        self.target_x_entry = ttk.Entry(nav_controls, width=8, font=("Arial", 9))  # FIXED: Smaller width
-        self.target_x_entry.grid(row=0, column=1, padx=3)
-        self.target_x_entry.insert(0, "2.0")
+        ttk.Label(nav_controls, text="Target X:", font=("Arial", 10, "bold")).grid(row=0, column=0, padx=5, sticky="e")
+        self.target_x_entry = ttk.Entry(nav_controls, width=10, font=("Arial", 10))
+        self.target_x_entry.grid(row=0, column=1, padx=5)
+        self.target_x_entry.insert(0, "2.0")  # Default to center
         
-        ttk.Label(nav_controls, text="Target Y:", font=("Arial", 9)).grid(row=0, column=2, padx=3, sticky="e")
-        self.target_y_entry = ttk.Entry(nav_controls, width=8, font=("Arial", 9))  # FIXED: Smaller width
-        self.target_y_entry.grid(row=0, column=3, padx=3)
-        self.target_y_entry.insert(0, "3.4")
+        ttk.Label(nav_controls, text="Target Y:", font=("Arial", 10, "bold")).grid(row=0, column=2, padx=5, sticky="e")
+        self.target_y_entry = ttk.Entry(nav_controls, width=10, font=("Arial", 10))
+        self.target_y_entry.grid(row=0, column=3, padx=5)
+        self.target_y_entry.insert(0, "3.4")  # Default to center
         
-        # FIXED: Navigation Button - Much smaller size
-        self.navigate_btn = tk.Button(nav_controls, text="🎯 NAVIGATE", 
+        # ENHANCED: Navigation Button - This is the button you were looking for!
+        self.navigate_btn = tk.Button(nav_controls, text="🎯 NAVIGATE TO TARGET", 
                                      command=self.navigate_to_target,
-                                     bg="#27ae60", fg="white", font=("Arial", 10, "bold"),
-                                     width=12, height=1, relief="raised", bd=2)  # FIXED: Smaller size
-        self.navigate_btn.grid(row=0, column=4, padx=5)
+                                     bg="#27ae60", fg="white", font=("Arial", 12, "bold"),
+                                     width=20, height=3, relief="raised", bd=4)
+        self.navigate_btn.grid(row=0, column=4, padx=10, rowspan=2)
         
-        # FIXED: Quick navigation buttons - smaller
+        # Quick navigation buttons
         quick_nav_frame = ttk.Frame(nav_controls)
-        quick_nav_frame.grid(row=1, column=0, columnspan=5, pady=2)  # FIXED: Reduced padding
+        quick_nav_frame.grid(row=1, column=0, columnspan=4, pady=5)
         
         quick_positions = [
             ("🏠 Center", 2.2, 3.4),
-            ("🔴 A0", 3.8, 0.6),
-            ("🟢 A1", 3.8, 6.2),
-            ("🔵 A2", 0.2, 3.2)
+            ("🔴 A0 Area", 3.8, 0.6),
+            ("🟢 A1 Area", 3.8, 6.2),
+            ("🔵 A2 Area", 0.2, 3.2)
         ]
         
         for i, (text, x, y) in enumerate(quick_positions):
             btn = tk.Button(quick_nav_frame, text=text, 
                            command=lambda x=x, y=y: self.quick_navigate(x, y),
-                           bg="#3498db", fg="white", font=("Arial", 8), 
-                           width=10, height=1)  # FIXED: Smaller buttons
-            btn.pack(side="left", padx=1)  # FIXED: Reduced padding
+                           bg="#3498db", fg="white", font=("Arial", 8), width=12)
+            btn.pack(side="left", padx=2)
         
-        self.nav_status = tk.Label(nav_frame, text="Navigation: Ready", 
-                                  font=("Arial", 9), fg="green")  # FIXED: Smaller font
-        self.nav_status.pack(pady=2)  # FIXED: Reduced padding
+        self.nav_status = tk.Label(nav_frame, text="Navigation: Ready for target", 
+                                  font=("Arial", 11, "bold"), fg="green")
+        self.nav_status.pack(pady=5)
         
-        # =============================================================================
-        # UWB STATUS FRAME - FIXED: Compact layout
-        # =============================================================================
-        uwb_frame = ttk.LabelFrame(left_frame, text="UWB Real-time Status")
-        uwb_frame.pack(fill="x", padx=3, pady=2)  # FIXED: Reduced padding
+        # OPTIMIZED: Enhanced UWB Status Frame
+        uwb_frame = ttk.LabelFrame(left_frame, text="Fast UWB Real-time Status")
+        uwb_frame.pack(fill="x", padx=5, pady=5)
         
-        # Position display - FIXED: Compact
+        # Position display with grid info
         pos_frame = ttk.Frame(uwb_frame)
-        pos_frame.pack(fill="x", padx=3, pady=2)
+        pos_frame.pack(fill="x", padx=5, pady=5)
         
         self.position_label = tk.Label(pos_frame, text="Position: X=0.00m, Y=0.00m", 
-                                      font=("Arial", 10, "bold"), fg="blue")
-        self.position_label.pack(side="left", padx=5)
+                                      font=("Arial", 12, "bold"), fg="blue")
+        self.position_label.pack(side="left", padx=10)
         
         self.grid_label = tk.Label(pos_frame, text="Grid: (0, 0)", 
-                                  font=("Arial", 10, "bold"), fg="green")
-        self.grid_label.pack(side="left", padx=5)
+                                  font=("Arial", 12, "bold"), fg="green")
+        self.grid_label.pack(side="left", padx=10)
         
-        # Room info - FIXED: Smaller font
+        # Room info display
         room_info = tk.Label(pos_frame, 
-                           text=f"Room: {ROOM_WIDTH}×{ROOM_HEIGHT}m ({GRID_SIZE_X}×{GRID_SIZE_Y})", 
-                           font=("Arial", 8), fg="gray")
-        room_info.pack(side="left", padx=5)
+                           text=f"Room: {ROOM_WIDTH}×{ROOM_HEIGHT}m ({GRID_SIZE_X}×{GRID_SIZE_Y} grid)", 
+                           font=("Arial", 10), fg="gray")
+        room_info.pack(side="left", padx=10)
         
-        # Kalman status - FIXED: Compact
+        # Kalman filter status
         kalman_frame = ttk.Frame(uwb_frame)
-        kalman_frame.pack(fill="x", padx=3, pady=1)
+        kalman_frame.pack(fill="x", padx=5, pady=2)
         
         self.kalman_status = tk.Label(kalman_frame, 
-                                     text=f"Kalman: {'On' if UWB_KALMAN_ENABLED else 'Off'}", 
-                                     font=("Arial", 9, "bold"), 
+                                     text=f"Optimized Kalman: {'Enabled' if UWB_KALMAN_ENABLED else 'Disabled'}", 
+                                     font=("Arial", 10, "bold"), 
                                      fg="green" if UWB_KALMAN_ENABLED else "red")
         self.kalman_status.pack(side="left")
         
-        if UWB_KALMAN_ENABLED:
-            self.accuracy_label = tk.Label(kalman_frame, text="Accuracy: 0.000m", 
-                                          font=("Arial", 9), fg="purple")
-            self.accuracy_label.pack(side="left", padx=10)
+        # Height compensation status
+        height_status = tk.Label(kalman_frame, 
+                               text=f"Height Comp: {UWB_HEIGHT_DIFFERENCE}m", 
+                               font=("Arial", 10), fg="purple")
+        height_status.pack(side="left", padx=20)
         
-        # Quality indicators - FIXED: Compact
+        if UWB_KALMAN_ENABLED:
+            self.accuracy_label = tk.Label(kalman_frame, text="Avg Accuracy: 0.000m", 
+                                          font=("Arial", 10), fg="purple")
+            self.accuracy_label.pack(side="left", padx=20)
+        
+        # Position quality indicators
         quality_frame = ttk.Frame(uwb_frame)
-        quality_frame.pack(fill="x", padx=3, pady=1)
+        quality_frame.pack(fill="x", padx=5, pady=2)
+        
+        self.position_quality_label = tk.Label(quality_frame, text="Position Quality: Good", 
+                                              font=("Arial", 10), fg="green")
+        self.position_quality_label.pack(side="left")
         
         self.updates_label = tk.Label(quality_frame, text="Updates: 0", 
-                                     font=("Arial", 9))
-        self.updates_label.pack(side="left")
+                                     font=("Arial", 10))
+        self.updates_label.pack(side="left", padx=20)
         
+        # UWB Reset button
         self.reset_uwb_btn = tk.Button(quality_frame, text="Reset UWB", 
                                       command=self.reset_uwb_diagnostics,
-                                      bg="#e67e22", fg="white", font=("Arial", 8),
-                                      width=8, height=1)  # FIXED: Smaller button
-        self.reset_uwb_btn.pack(side="right", padx=3)
+                                      bg="#e67e22", fg="white", font=("Arial", 9))
+        self.reset_uwb_btn.pack(side="right", padx=5)
         
-        # =============================================================================
-        # ANCHOR DISTANCES - FIXED: More compact
-        # =============================================================================
-        anchor_frame = ttk.LabelFrame(uwb_frame, text="Anchor Distances")
-        anchor_frame.pack(fill="x", padx=3, pady=2)
+        # OPTIMIZED: Anchor distances display
+        anchor_frame = ttk.LabelFrame(uwb_frame, text="Anchor Distances (3D → Ground)")
+        anchor_frame.pack(fill="x", padx=5, pady=5)
         
         self.anchor_labels = {}
         self.anchor_ground_labels = {}
         self.anchor_quality_labels = {}
         
+        # Create anchor info based on actual positions
         anchor_info = [
-            ("A0", "red", (4.0, 0.4)),
-            ("A1", "green", (4.0, 6.4)),
-            ("A2", "blue", (0.0, 3.2))
+            (f"A0 @Grid(10,1)", "red", (4.0, 0.4)),
+            (f"A1 @Grid(10,16)", "green", (4.0, 6.4)),
+            (f"A2 @Grid(0,8)", "blue", (0.0, 3.2))
         ]
         
         for i, (name, color, pos) in enumerate(anchor_info):
             frame = ttk.Frame(anchor_frame)
-            frame.pack(side="left", padx=5)
+            frame.pack(side="left", padx=10)
             
-            ttk.Label(frame, text=f"{name}:", font=("Arial", 8, "bold")).pack()
+            ttk.Label(frame, text=f"{name}:", font=("Arial", 9, "bold")).pack()
+            ttk.Label(frame, text=f"({pos[0]}, {pos[1]})", font=("Arial", 8), foreground="gray").pack()
             
-            distance_label = tk.Label(frame, text="3D: 0.00m", font=("Arial", 8), fg=color)
+            # 3D distance
+            distance_label = tk.Label(frame, text="3D: 0.00m", font=("Arial", 9), fg=color)
             distance_label.pack()
             self.anchor_labels[i] = distance_label
             
-            ground_label = tk.Label(frame, text="2D: 0.00m", font=("Arial", 8), fg=color)
+            # Ground distance
+            ground_label = tk.Label(frame, text="2D: 0.00m", font=("Arial", 9), fg=color)
             ground_label.pack()
             self.anchor_ground_labels[i] = ground_label
             
-            quality_label = tk.Label(frame, text="●", font=("Arial", 10), fg="gray")
+            # Quality indicator
+            quality_label = tk.Label(frame, text="●", font=("Arial", 12), fg="gray")
             quality_label.pack()
             self.anchor_quality_labels[i] = quality_label
         
-        # =============================================================================
-        # MAP FRAME - PRESERVED: Keep exact same map functionality
-        # =============================================================================
-        map_frame = ttk.LabelFrame(left_frame, text=f"Position Map ({GRID_SIZE_X}×{GRID_SIZE_Y} Grid)")
-        map_frame.pack(fill="x", padx=3, pady=2)  # FIXED: Keep map, reduce padding only
+        # OPTIMIZED: Map Frame with FIXED HEIGHT so navigation doesn't get hidden
+        map_frame = ttk.LabelFrame(left_frame, text=f"Fast Real-time Position Map ({GRID_SIZE_X}×{GRID_SIZE_Y} Grid)")
+        map_frame.pack(fill="x", padx=5, pady=5)  # FIXED: Changed from fill="both", expand=True
         
-        # PRESERVED: Create grid map with exact same functionality
+        # Create grid map
         self.create_grid_map(map_frame)
 
-        # =============================================================================
-        # RIGHT PANE: Controls and Sensor - FIXED: Compact layout
-        # =============================================================================
+        # Right pane: Controls and Sensor (keeping existing layout)
         right_frame = ttk.Frame(main_pane)
         main_pane.add(right_frame, weight=1)
 
-        # FIXED: Manual Control Frame - smaller
+        # Manual Control Frame
         control_frame = ttk.LabelFrame(right_frame, text="Manual Controls")
-        control_frame.pack(fill="x", padx=3, pady=2)
+        control_frame.pack(fill="x", padx=5, pady=5)
         
         btn_frame = ttk.Frame(control_frame)
-        btn_frame.pack(padx=5, pady=5)
+        btn_frame.pack(padx=10, pady=10)
         
-        # FIXED: Smaller manual control buttons
-        btn_style = {"width": 6, "height": 1, "bg": "#3498DB", "fg": "white", "font": ("Arial", 9)}
-        tk.Button(btn_frame, text="↑", command=self.on_forward, **btn_style).grid(row=0, column=1, pady=1)
-        tk.Button(btn_frame, text="←", command=self.on_left, **btn_style).grid(row=1, column=0, padx=1)
-        tk.Button(btn_frame, text="STOP", command=self.on_stop, bg="#E74C3C", fg="white",
-                  font=("Arial", 9), width=6, height=1).grid(row=1, column=1, pady=1)
-        tk.Button(btn_frame, text="→", command=self.on_right, **btn_style).grid(row=1, column=2, padx=1)
-        tk.Button(btn_frame, text="↓", command=self.on_backward, **btn_style).grid(row=2, column=1, pady=1)
+        btn_style = {"width": 8, "height": 1, "bg": "#3498DB", "fg": "white", "font": ("Arial", 10)}
+        tk.Button(btn_frame, text="Forward", command=self.on_forward, **btn_style).grid(row=0, column=1, pady=2)
+        tk.Button(btn_frame, text="Left", command=self.on_left, **btn_style).grid(row=1, column=0, padx=2)
+        tk.Button(btn_frame, text="Stop", command=self.on_stop, bg="#E74C3C", fg="white",
+                  font=("Arial", 10), width=8, height=1).grid(row=1, column=1, pady=2)
+        tk.Button(btn_frame, text="Right", command=self.on_right, **btn_style).grid(row=1, column=2, padx=2)
+        tk.Button(btn_frame, text="Backward", command=self.on_backward, **btn_style).grid(row=2, column=1, pady=2)
 
         self.speed_var = tk.IntVar(value=int(MAX_SPEED))
         tk.Scale(control_frame, from_=0, to=30, orient=tk.HORIZONTAL, label="Speed (RPM)",
-                 variable=self.speed_var, length=150, font=("Arial", 8)).pack(pady=2)  # FIXED: Smaller
+                 variable=self.speed_var, length=200).pack(pady=5)
 
-        # FIXED: Task Frame - more compact
+        # Task Frame
         task_frame = ttk.LabelFrame(right_frame, text="Tasks")
-        task_frame.pack(fill="x", padx=3, pady=2)
+        task_frame.pack(fill="x", padx=5, pady=5)
         
-        # Line Following Task - FIXED: Smaller buttons
+        # Line Following Task
         self.task1_btn = tk.Button(task_frame, text="Start Line Following", 
-                                  command=self.start_line_following,
-                                  bg="#1ABC9C", fg="white", font=("Arial", 9),
-                                  width=18, height=1)  # FIXED: Smaller
-        self.task1_btn.pack(pady=2)
+                                  command=self.start_task1,
+                                  bg="#1ABC9C", fg="white", font=("Arial", 10, "bold"),
+                                  width=20, height=2)
+        self.task1_btn.pack(pady=5)
         
         self.task1_status = tk.Label(task_frame, text="Line Following: Stopped", 
-                                    font=("Arial", 9))
-        self.task1_status.pack(pady=1)
+                                    font=("Arial", 10))
+        self.task1_status.pack(pady=2)
         
         self.task1_error = tk.Label(task_frame, text="PID Error: 0.00", 
-                                   font=("Arial", 9))
-        self.task1_error.pack(pady=1)
+                                   font=("Arial", 10))
+        self.task1_error.pack(pady=2)
 
-        # Task 1 Navigation - FIXED: Smaller
+        # NEW: Task 1 - Navigation to Grid (6,10)
         separator = ttk.Separator(task_frame, orient='horizontal')
-        separator.pack(fill='x', pady=5)
+        separator.pack(fill='x', pady=10)
         
-        self.task1_nav_btn = tk.Button(task_frame, text="🎯 Task 1 (Grid 6,10)", 
+        self.task1_nav_btn = tk.Button(task_frame, text="🎯 Start Task 1 (Go to Grid 6,10)", 
                                       command=self.start_task1_navigation,
-                                      bg="#9b59b6", fg="white", font=("Arial", 9),
-                                      width=18, height=1)  # FIXED: Smaller
-        self.task1_nav_btn.pack(pady=2)
+                                      bg="#9b59b6", fg="white", font=("Arial", 10, "bold"),
+                                      width=25, height=2)
+        self.task1_nav_btn.pack(pady=5)
 
         self.task1_nav_status = tk.Label(task_frame, text="Task 1: Ready", 
-                                        font=("Arial", 9))
-        self.task1_nav_status.pack(pady=1)
+                                        font=("Arial", 10))
+        self.task1_nav_status.pack(pady=2)
 
-        # FIXED: PID settings - more compact
+        # PID settings
         pid_frame = ttk.Frame(task_frame)
-        pid_frame.pack(fill="x", padx=3, pady=2)
+        pid_frame.pack(fill="x", padx=10, pady=5)
         
-        ttk.Label(pid_frame, text="Kp:", font=("Arial", 8)).grid(row=0, column=0, padx=1, sticky="e")
-        self.kp_entry = ttk.Entry(pid_frame, width=6, font=("Arial", 8))  # FIXED: Smaller
-        self.kp_entry.grid(row=0, column=1, padx=1)
+        ttk.Label(pid_frame, text="Kp:", font=("Arial", 9)).grid(row=0, column=0, padx=2, sticky="e")
+        self.kp_entry = ttk.Entry(pid_frame, width=8)
+        self.kp_entry.grid(row=0, column=1, padx=2)
         self.kp_entry.insert(0, str(INITIAL_PID_KP))
         
-        ttk.Label(pid_frame, text="Ki:", font=("Arial", 8)).grid(row=0, column=2, padx=1, sticky="e")
-        self.ki_entry = ttk.Entry(pid_frame, width=6, font=("Arial", 8))  # FIXED: Smaller
-        self.ki_entry.grid(row=0, column=3, padx=1)
+        ttk.Label(pid_frame, text="Ki:", font=("Arial", 9)).grid(row=0, column=2, padx=2, sticky="e")
+        self.ki_entry = ttk.Entry(pid_frame, width=8)
+        self.ki_entry.grid(row=0, column=3, padx=2)
         self.ki_entry.insert(0, str(INITIAL_PID_KI))
         
-        ttk.Label(pid_frame, text="Kd:", font=("Arial", 8)).grid(row=0, column=4, padx=1, sticky="e")
-        self.kd_entry = ttk.Entry(pid_frame, width=6, font=("Arial", 8))  # FIXED: Smaller
-        self.kd_entry.grid(row=0, column=5, padx=1)
+        ttk.Label(pid_frame, text="Kd:", font=("Arial", 9)).grid(row=0, column=4, padx=2, sticky="e")
+        self.kd_entry = ttk.Entry(pid_frame, width=8)
+        self.kd_entry.grid(row=0, column=5, padx=2)
         self.kd_entry.insert(0, str(INITIAL_PID_KD))
         
-        tk.Button(pid_frame, text="Update", command=self.update_pid,
-                  bg="#F1C40F", fg="black", font=("Arial", 8), width=6).grid(row=0, column=6, padx=3)
+        tk.Button(pid_frame, text="Update PID", command=self.update_pid,
+                  bg="#F1C40F", fg="black", font=("Arial", 9)).grid(row=0, column=6, padx=5)
 
-        # FIXED: Sensor Frame - more compact but preserve functionality
+        # OPTIMIZED: UWB Diagnostics Frame (simplified)
+        diag_frame = ttk.LabelFrame(right_frame, text="Fast UWB Diagnostics")
+        diag_frame.pack(fill="x", padx=5, pady=5)
+        
+        # Simplified diagnostics display
+        diag_display = ttk.Frame(diag_frame)
+        diag_display.pack(fill="x", padx=5, pady=5)
+        
+        # Performance indicator
+        ttk.Label(diag_display, text="Performance:", font=("Arial", 9, "bold")).grid(row=0, column=0, sticky="w")
+        self.performance_label = ttk.Label(diag_display, text="Optimized", font=("Arial", 9), foreground="green")
+        self.performance_label.grid(row=0, column=1, padx=5, sticky="w")
+        
+        # Update rate display
+        ttk.Label(diag_display, text="Update Rate:", font=("Arial", 9)).grid(row=1, column=0, sticky="w")
+        self.update_rate_label = ttk.Label(diag_display, text="0 Hz", font=("Arial", 9))
+        self.update_rate_label.grid(row=1, column=1, padx=5, sticky="w")
+
+        # OPTIMIZED: Sensor Frame (keeping functionality)
         sensor_frame = ttk.LabelFrame(right_frame, text="Magnetic Sensor Data")
-        sensor_frame.pack(fill="both", expand=True, padx=3, pady=2)
+        sensor_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         data_display = ttk.Frame(sensor_frame)
-        data_display.pack(fill="x", padx=3, pady=2)
+        data_display.pack(fill="x", padx=5, pady=5)
         
-        ttk.Label(data_display, text="Median:", font=("Arial", 8)).grid(row=0, column=0, sticky="w")
-        self.intermediate_value = ttk.Label(data_display, text="0", font=("Arial", 8, "bold"))
-        self.intermediate_value.grid(row=0, column=1, padx=3, sticky="w")
+        ttk.Label(data_display, text="Median Value:", font=("Arial", 9)).grid(row=0, column=0, sticky="w")
+        self.intermediate_value = ttk.Label(data_display, text="0", font=("Arial", 9, "bold"))
+        self.intermediate_value.grid(row=0, column=1, padx=5, sticky="w")
         
-        ttk.Label(data_display, text="Position:", font=("Arial", 8)).grid(row=1, column=0, sticky="w")
-        self.position_value_label = ttk.Label(data_display, text="0x0000", font=("Arial", 8, "bold"))
-        self.position_value_label.grid(row=1, column=1, padx=3, sticky="w")
+        ttk.Label(data_display, text="Position (Hex):", font=("Arial", 9)).grid(row=1, column=0, sticky="w")
+        self.position_value_label = ttk.Label(data_display, text="0x0000", font=("Arial", 9, "bold"))
+        self.position_value_label.grid(row=1, column=1, padx=5, sticky="w")
 
-        # PRESERVED: Sensor visualization - keep exact functionality
-        ttk.Label(sensor_frame, text="Sensors: [1-8=RIGHT] | [9-16=LEFT]", font=("Arial", 8)).pack(pady=1)
-        self.sensor_canvas = tk.Canvas(sensor_frame, width=400, height=50, bg="white")  # FIXED: Smaller height
-        self.sensor_canvas.pack(fill="x", padx=3, pady=2)
+        # Sensor visualization
+        ttk.Label(sensor_frame, text="Sensors: [1-8=RIGHT] | [9-16=LEFT]", font=("Arial", 8)).pack(pady=2)
+        self.sensor_canvas = tk.Canvas(sensor_frame, width=400, height=60, bg="white")
+        self.sensor_canvas.pack(fill="x", padx=5, pady=5)
         
         self.sensor_points = []
         for i in range(16):
             x = 20 + i * 23
-            y = 25  # FIXED: Adjusted for smaller canvas
-            circle = self.sensor_canvas.create_oval(x-6, y-6, x+6, y+6, fill="white", outline="black")
-            text = self.sensor_canvas.create_text(x, y, text=str(i+1), font=("Arial", 6))
+            y = 30
+            circle = self.sensor_canvas.create_oval(x-8, y-8, x+8, y+8, fill="white", outline="black")
+            text = self.sensor_canvas.create_text(x, y, text=str(i+1), font=("Arial", 7))
             self.sensor_points.append((circle, text))
 
-        # FIXED: Status Frame - compact
+        # Status Frame
         status_frame = ttk.Frame(right_frame)
-        status_frame.pack(fill="x", padx=3, pady=2)
+        status_frame.pack(fill="x", padx=5, pady=5)
         
         self.status_var = tk.StringVar(value="Connecting...")
         self.status_label = tk.Label(status_frame, textvariable=self.status_var, 
-                                    font=("Arial", 9), fg="red")
+                                    font=("Arial", 10), fg="red")
         self.status_label.pack()
         
-        # FIXED: Motor feedback - compact
+        # Motor feedback
         feedback_frame = ttk.LabelFrame(right_frame, text="Motor Feedback")
-        feedback_frame.pack(fill="x", padx=3, pady=2)
+        feedback_frame.pack(fill="x", padx=5, pady=5)
         
-        self.lbl_motor1 = tk.Label(feedback_frame, text="Motor 1: Unknown", font=("Arial", 8))
-        self.lbl_motor1.pack(anchor="w", padx=3)
-        self.lbl_motor2 = tk.Label(feedback_frame, text="Motor 2: Unknown", font=("Arial", 8))
-        self.lbl_motor2.pack(anchor="w", padx=3)
+        self.lbl_motor1 = tk.Label(feedback_frame, text="Motor 1: Unknown", font=("Arial", 9))
+        self.lbl_motor1.pack(anchor="w", padx=5)
+        self.lbl_motor2 = tk.Label(feedback_frame, text="Motor 2: Unknown", font=("Arial", 9))
+        self.lbl_motor2.pack(anchor="w", padx=5)
 
-        # FIXED: Log text - smaller
-        self.log_text = tk.Text(right_frame, height=4, width=40, font=("Arial", 8))  # FIXED: Smaller height
-        self.log_text.pack(fill="x", padx=3, pady=2)
+        # Log text
+        self.log_text = tk.Text(right_frame, height=6, width=40, font=("Arial", 8))
+        self.log_text.pack(fill="x", padx=5, pady=5)
         self.log_handler = TextHandler(self.log_text)
         logger.addHandler(self.log_handler)
 
-    # =============================================================================
-    # MAP FUNCTIONS - PRESERVED: Keep exact same functionality
-    # =============================================================================
     def create_grid_map(self, parent):
-        """PRESERVED: Create exact same visual grid map functionality"""
+        """OPTIMIZED: Create compact visual grid map (ORIGINAL COORDINATES - CORRECT)"""
         map_container = tk.Frame(parent, bg='white', relief=tk.SUNKEN, bd=2)
-        map_container.pack(padx=3, pady=3)
+        map_container.pack(padx=5, pady=5)
         
-        # PRESERVED: Calculate same canvas size
+        # SMALLER: Calculate compact canvas size
         canvas_width = self.grid_size_x * self.cell_size + 30
         canvas_height = self.grid_size_y * self.cell_size + 30
         
@@ -345,7 +364,7 @@ class AGVApp(tk.Tk):
                                    bg='white', highlightthickness=0)
         self.map_canvas.pack()
         
-        # PRESERVED: Draw grid lines exactly same
+        # Draw grid lines
         for i in range(self.grid_size_x + 1):
             x = i * self.cell_size + 15
             self.map_canvas.create_line(x, 15, x, self.grid_size_y * self.cell_size + 15,
@@ -356,7 +375,7 @@ class AGVApp(tk.Tk):
             self.map_canvas.create_line(15, y, self.grid_size_x * self.cell_size + 15, y,
                                        fill='#bdc3c7', width=1)
         
-        # PRESERVED: Add coordinate labels exactly same
+        # Add coordinate labels (ORIGINAL WITH Y FLIP - CORRECT)
         for i in range(0, self.grid_size_x, 3):
             x = i * self.cell_size + self.cell_size/2 + 15
             self.map_canvas.create_text(x, 8, text=str(i), font=("Arial", 7))
@@ -364,13 +383,13 @@ class AGVApp(tk.Tk):
         for i in range(0, self.grid_size_y, 3):
             y = i * self.cell_size + self.cell_size/2 + 15
             self.map_canvas.create_text(8, self.grid_size_y * self.cell_size - y + 15, 
-                                       text=str(i), font=("Arial", 7))
+                                       text=str(i), font=("Arial", 7))  # ORIGINAL: Y flip
         
-        # PRESERVED: Create grid cells exactly same
+        # Create grid cells (ORIGINAL WITH Y FLIP - CORRECT)
         for x in range(self.grid_size_x):
             for y in range(self.grid_size_y):
                 x1 = x * self.cell_size + 16
-                y1 = (self.grid_size_y - 1 - y) * self.cell_size + 16
+                y1 = (self.grid_size_y - 1 - y) * self.cell_size + 16  # ORIGINAL: Y flip
                 x2 = x1 + self.cell_size - 2
                 y2 = y1 + self.cell_size - 2
                 
@@ -379,7 +398,7 @@ class AGVApp(tk.Tk):
                                                        width=0)
                 self.grid_cells[(x, y)] = rect
         
-        # PRESERVED: Create anchor markers exactly same
+        # Create anchor markers at CORRECT positions (ORIGINAL WITH Y FLIP - CORRECT)
         anchor_positions = [
             (10, 1, "A0", "red"),
             (10, 16, "A1", "green"),
@@ -388,7 +407,7 @@ class AGVApp(tk.Tk):
         
         for grid_x, grid_y, label, color in anchor_positions:
             canvas_x = grid_x * self.cell_size + self.cell_size/2 + 15
-            canvas_y = (self.grid_size_y - 1 - grid_y) * self.cell_size + self.cell_size/2 + 15
+            canvas_y = (self.grid_size_y - 1 - grid_y) * self.cell_size + self.cell_size/2 + 15  # ORIGINAL: Y flip
             
             anchor = self.map_canvas.create_oval(canvas_x-6, canvas_y-6, canvas_x+6, canvas_y+6,
                                                fill=color, outline='black', width=2)
@@ -397,11 +416,11 @@ class AGVApp(tk.Tk):
             
             self.anchor_markers[label] = (anchor, anchor_text)
         
-        # PRESERVED: Highlight target grid exactly same
+        # Highlight target grid (6,10) for Task 1 (ORIGINAL WITH Y FLIP - CORRECT)
         target_grid_x, target_grid_y = TASK1_TARGET_GRID
         if 0 <= target_grid_x < self.grid_size_x and 0 <= target_grid_y < self.grid_size_y:
             canvas_x = target_grid_x * self.cell_size + self.cell_size/2 + 15
-            canvas_y = (self.grid_size_y - 1 - target_grid_y) * self.cell_size + self.cell_size/2 + 15
+            canvas_y = (self.grid_size_y - 1 - target_grid_y) * self.cell_size + self.cell_size/2 + 15  # ORIGINAL: Y flip
             
             target_marker = self.map_canvas.create_rectangle(
                 canvas_x - 8, canvas_y - 8, canvas_x + 8, canvas_y + 8,
@@ -411,93 +430,61 @@ class AGVApp(tk.Tk):
                                                     text="Task1", font=("Arial", 8, "bold"), 
                                                     fill='#8e44ad')
         
-        # PRESERVED: Create AGV marker exactly same
+        # Create AGV marker
         self.agv_marker = self.map_canvas.create_oval(0, 0, 12, 12,
                                                      fill='#3498db', outline='#2980b9',
                                                      width=2)
         
+        # Create direction indicator
         self.agv_direction = self.map_canvas.create_line(0, 0, 0, 0,
                                                         fill='#e74c3c', width=2,
                                                         arrow=tk.LAST)
         
-        # PRESERVED: Initially hide AGV
+        # Initially hide AGV
         self.map_canvas.itemconfig(self.agv_marker, state='hidden')
         self.map_canvas.itemconfig(self.agv_direction, state='hidden')
         
-        # PRESERVED: Mouse click event
+        # Mouse click event for easy target setting
         self.map_canvas.bind("<Button-1>", self.on_map_click)
 
-    # PRESERVED: All coordinate conversion functions exactly same
     def real_to_canvas_coords(self, real_x, real_y):
-        """PRESERVED: Convert real-world coordinates to canvas coordinates"""
+        """Convert real-world coordinates to canvas coordinates (ORIGINAL WITH Y FLIP - CORRECT for map elements)"""
         grid_x = real_x / CELL_SIZE
         grid_y = real_y / CELL_SIZE
         
         canvas_x = grid_x * self.cell_size + 15
-        canvas_y = (self.grid_size_y - grid_y) * self.cell_size + 15
+        canvas_y = (self.grid_size_y - grid_y) * self.cell_size + 15  # ORIGINAL: Y flip
         
         return canvas_x, canvas_y
 
     def agv_real_to_canvas_coords(self, real_x, real_y):
-        """PRESERVED: Convert AGV real-world coordinates to canvas coordinates"""
+        """FIXED: Convert AGV real-world coordinates to canvas coordinates (NO Y FLIP for AGV)"""
         grid_x = real_x / CELL_SIZE
         grid_y = real_y / CELL_SIZE
         
         canvas_x = grid_x * self.cell_size + 15
-        canvas_y = grid_y * self.cell_size + 15
+        canvas_y = grid_y * self.cell_size + 15  # NO Y FLIP for AGV position
         
         return canvas_x, canvas_y
 
     def canvas_to_real_coords(self, canvas_x, canvas_y):
-        """PRESERVED: Convert canvas coordinates to real-world coordinates"""
+        """Convert canvas coordinates to real-world coordinates (ORIGINAL WITH Y FLIP - CORRECT)"""
         grid_x = (canvas_x - 15) / self.cell_size
-        grid_y = self.grid_size_y - (canvas_y - 15) / self.cell_size
+        grid_y = self.grid_size_y - (canvas_y - 15) / self.cell_size  # ORIGINAL: Y flip
         
         real_x = grid_x * CELL_SIZE
         real_y = grid_y * CELL_SIZE
         
         return real_x, real_y
 
-    def update_agv_position(self, x, y, heading=90):
-        """PRESERVED: Update AGV position with exact same functionality"""
-        dx = x - self.last_agv_pos[0]
-        dy = y - self.last_agv_pos[1]
-        if (dx**2 + dy**2) < self.position_update_threshold**2:
-            return
-        
-        self.last_agv_pos = (x, y)
-        
-        canvas_x, canvas_y = self.agv_real_to_canvas_coords(x, y)
-        
-        self.map_canvas.coords(self.agv_marker,
-                              canvas_x - 6, canvas_y - 6,
-                              canvas_x + 6, canvas_y + 6)
-        
-        if self.gui_update_counter % 3 == 0:
-            dx = 10 * math.cos(math.radians(heading))
-            dy = -10 * math.sin(math.radians(heading))
-            self.map_canvas.coords(self.agv_direction,
-                                  canvas_x, canvas_y,
-                                  canvas_x + dx, canvas_y + dy)
-        
-        self.map_canvas.itemconfig(self.agv_marker, state='normal')
-        self.map_canvas.itemconfig(self.agv_direction, state='normal')
-        
-        grid_x = int(x / CELL_SIZE)
-        grid_y = int(y / CELL_SIZE)
-        if 0 <= grid_x < self.grid_size_x and 0 <= grid_y < self.grid_size_y:
-            for coord, rect in self.grid_cells.items():
-                if coord == (grid_x, grid_y):
-                    self.map_canvas.itemconfig(rect, fill='#e8f6f3', outline='#27ae60', width=2)
-                else:
-                    self.map_canvas.itemconfig(rect, fill='', outline='', width=0)
-
     def draw_planned_path(self, path_lines):
-        """PRESERVED: Draw planned path exactly same"""
+        """Draw planned path as green lines on map"""
+        # Clear previous path lines
         for line in getattr(self, 'path_lines', []):
             self.map_canvas.delete(line)
         self.path_lines = []
         
+        # Draw new path lines using AGV coordinate system (no Y flip)
         for from_pos, to_pos in path_lines:
             from_canvas = self.agv_real_to_canvas_coords(from_pos[0], from_pos[1])
             to_canvas = self.agv_real_to_canvas_coords(to_pos[0], to_pos[1])
@@ -509,8 +496,47 @@ class AGVApp(tk.Tk):
             )
             self.path_lines.append(line)
 
+    def update_agv_position(self, x, y, heading=90):
+        """FIXED: Update AGV position with correct coordinates (NO Y FLIP for AGV)"""
+        # Only update if significant movement
+        dx = x - self.last_agv_pos[0]
+        dy = y - self.last_agv_pos[1]
+        if (dx**2 + dy**2) < self.position_update_threshold**2:
+            return  # Skip update if movement too small
+        
+        self.last_agv_pos = (x, y)
+        
+        # FIXED: Use AGV-specific coordinate conversion (no Y flip)
+        canvas_x, canvas_y = self.agv_real_to_canvas_coords(x, y)
+        
+        # Update AGV marker position
+        self.map_canvas.coords(self.agv_marker,
+                              canvas_x - 6, canvas_y - 6,
+                              canvas_x + 6, canvas_y + 6)
+        
+        # Update direction indicator
+        dx = 15 * math.cos(math.radians(heading))
+        dy = -15 * math.sin(math.radians(heading))
+        self.map_canvas.coords(self.agv_direction,
+                              canvas_x, canvas_y,
+                              canvas_x + dx, canvas_y + dy)
+        
+        # Show AGV
+        self.map_canvas.itemconfig(self.agv_marker, state='normal')
+        self.map_canvas.itemconfig(self.agv_direction, state='normal')
+        
+        # FIXED: Highlight current grid cell with correct coordinates (no Y flip)
+        grid_x = int(x / CELL_SIZE)
+        grid_y = int(y / CELL_SIZE)
+        if 0 <= grid_x < self.grid_size_x and 0 <= grid_y < self.grid_size_y:
+            for coord, rect in self.grid_cells.items():
+                if coord == (grid_x, grid_y):
+                    self.map_canvas.itemconfig(rect, fill='#e8f6f3', outline='#27ae60', width=2)
+                else:
+                    self.map_canvas.itemconfig(rect, fill='', outline='', width=0)
+
     def update_target_position(self, x, y):
-        """PRESERVED: Update target position exactly same"""
+        """Update target position on the map"""
         if self.target_marker:
             self.map_canvas.delete(self.target_marker)
         
@@ -523,27 +549,27 @@ class AGVApp(tk.Tk):
         )
 
     def on_map_click(self, event):
-        """PRESERVED: Handle click on map exactly same"""
+        """Handle click on map to set target"""
         real_x, real_y = self.canvas_to_real_coords(event.x, event.y)
         
+        # Clamp to room bounds
         real_x = max(0, min(ROOM_WIDTH, real_x))
         real_y = max(0, min(ROOM_HEIGHT, real_y))
         
+        # Update target entries
         self.target_x_entry.delete(0, tk.END)
         self.target_x_entry.insert(0, f"{real_x:.1f}")
         self.target_y_entry.delete(0, tk.END)
         self.target_y_entry.insert(0, f"{real_y:.1f}")
         
+        # Update target marker
         self.update_target_position(real_x, real_y)
 
-    # =============================================================================
-    # NAVIGATION FUNCTIONS - PRESERVED but connected to merged controller
-    # =============================================================================
     def navigate_to_target(self):
-        """Navigate to target position using merged controller"""
+        """ENHANCED: Navigate to target position using fast UWB"""
         if not self.controller.uwb_enabled:
             messagebox.showwarning("UWB Not Available", 
-                                  "UWB navigation is not available. Check UWB connection.")
+                                  "UWB navigation is not available. Check UWB connection and try again.")
             return
             
         try:
@@ -551,15 +577,19 @@ class AGVApp(tk.Tk):
             y = float(self.target_y_entry.get())
             
             if not (0 <= x <= ROOM_WIDTH and 0 <= y <= ROOM_HEIGHT):
-                raise ValueError(f"Coordinates must be within {ROOM_WIDTH}×{ROOM_HEIGHT}m")
+                raise ValueError(f"Coordinates must be within the {ROOM_WIDTH}×{ROOM_HEIGHT}m room area")
             
+            # Update visual target
             self.update_target_position(x, y)
+            
+            # Send navigation command to controller
             self.command_queue.put(("navigate_to", (x, y)))
             
+            # Update UI feedback
             self.nav_status.config(text=f"🎯 Navigating to ({x:.1f}, {y:.1f})...", fg="blue")
             self.navigate_btn.config(text="🔄 Navigating...", bg="#e67e22")
             
-            logger.info(f"Navigation started to ({x:.1f}, {y:.1f})")
+            logger.info(f"Navigation started to ({x:.1f}, {y:.1f}) with fast positioning")
             
         except ValueError as e:
             messagebox.showerror("Invalid Input", str(e))
@@ -576,7 +606,7 @@ class AGVApp(tk.Tk):
         """Start Task 1 - Navigate to grid (6,10)"""
         if not self.controller.uwb_enabled:
             messagebox.showwarning("UWB Not Available", 
-                                  "UWB navigation required for Task 1.")
+                                  "UWB navigation is required for Task 1. Check UWB connection.")
             return
         
         self.command_queue.put(("start_task1", None))
@@ -587,12 +617,9 @@ class AGVApp(tk.Tk):
         self.command_queue.put(("reset_uwb", None))
         logger.info("UWB diagnostics reset requested")
 
-    # =============================================================================
-    # UPDATE FUNCTIONS - PRESERVED functionality, optimized for merged controller
-    # =============================================================================
     def update_anchor_distances(self):
-        """Update anchor distance displays"""
-        if hasattr(self.controller, 'uwb') and self.controller.uwb:
+        """OPTIMIZED: Separate method for anchor distance updates"""
+        if hasattr(self.controller.uwb, 'get_anchor_distances'):
             distances_3d = self.controller.uwb.get_anchor_distances()
             distances_2d = self.controller.uwb.get_anchor_distances_2d()
             
@@ -604,31 +631,38 @@ class AGVApp(tk.Tk):
                     label.config(text=f"3D: {distance_3d:.3f}m")
                     self.anchor_ground_labels[i].config(text=f"2D: {distance_2d:.3f}m")
                     
+                    # Update quality indicator
                     if 0.1 <= distance_3d <= 25.0:
                         self.anchor_quality_labels[i].config(fg="green")
                     else:
                         self.anchor_quality_labels[i].config(fg="red")
 
     def update_diagnostics(self):
-        """Update UWB diagnostics"""
+        """OPTIMIZED: Separate method for diagnostics updates"""
         diagnostics = self.controller.get_uwb_diagnostics()
         
         if UWB_KALMAN_ENABLED and hasattr(self, 'accuracy_label'):
             avg_accuracy = diagnostics.get('average_accuracy', 0)
-            self.accuracy_label.config(text=f"Accuracy: {avg_accuracy:.3f}m")
+            self.accuracy_label.config(text=f"Avg Accuracy: {avg_accuracy:.3f}m")
         
         update_count = diagnostics.get('update_count', 0)
         self.updates_label.config(text=f"Updates: {update_count}")
+        
+        # Update rate calculation
+        if hasattr(self, 'last_update_count'):
+            rate = (update_count - self.last_update_count) * (1000 / GUI_UPDATE_RATE / GUI_HEAVY_UPDATE_INTERVAL)
+            self.update_rate_label.config(text=f"{rate:.1f} Hz")
+        self.last_update_count = update_count
 
     def update_sensor_display(self):
-        """PRESERVED: Update sensor display with exact functionality"""
+        """OPTIMIZED: Update sensor display"""
         try:
             median_value, position_value = self.sensor_queue.get_nowait()
             if median_value is not None and position_value is not None:
                 self.intermediate_value.config(text=f"{median_value:.1f}")
                 self.position_value_label.config(text=f"0x{position_value:04X}")
                 
-                # PRESERVED: Update sensor visualization exactly same
+                # Update sensor visualization
                 for i in range(16):
                     bit_value = not ((position_value >> i) & 1)
                     if bit_value:
@@ -645,7 +679,7 @@ class AGVApp(tk.Tk):
             pass
 
     def update_status_display(self):
-        """Update status display"""
+        """OPTIMIZED: Update status display"""
         with self.controller.lock:
             self.status_var.set(f"State: {self.controller.state.name}")
             
@@ -661,34 +695,20 @@ class AGVApp(tk.Tk):
             # Update Task 1 Navigation status
             if self.controller.state == AGVState.TASK1_NAVIGATION:
                 self.task1_nav_btn.config(text="🔄 Task 1 Running...", bg="#e67e22")
-                if self.controller.navigation:
-                    nav_status = self.controller.navigation.get_status()
-                    progress = nav_status.get('progress', '0/0')
-                    current_step = nav_status.get('current_step', 'None')
-                    self.task1_nav_status.config(text=f"Task 1: {progress} - {current_step}")
-                    
-                    path_lines = nav_status.get('path_visualization', [])
-                    if path_lines:
-                        self.draw_planned_path(path_lines)
+                self.task1_nav_status.config(text=f"Task 1: Navigating to grid {TASK1_TARGET_GRID}")
             else:
-                self.task1_nav_btn.config(text="🎯 Task 1 (Grid 6,10)", bg="#9b59b6")
+                self.task1_nav_btn.config(text="🎯 Start Task 1 (Go to Grid 6,10)", bg="#9b59b6")
                 if self.controller.state == AGVState.IDLE:
                     self.task1_nav_status.config(text="Task 1: Ready")
             
             # Update navigation button based on state
             if self.controller.state == AGVState.UWB_NAVIGATION:
                 self.navigate_btn.config(text="🔄 Navigating...", bg="#e67e22")
-                if self.controller.navigation:
-                    nav_status = self.controller.navigation.get_status()
-                    distance = nav_status.get('distance_to_target')
-                    if distance is not None:
-                        self.nav_status.config(text=f"🎯 Navigation: {nav_status['state']} (Dist: {distance:.3f}m)", fg="blue")
-                    else:
-                        self.nav_status.config(text=f"🎯 Navigation: {nav_status['state']}", fg="blue")
+                self.nav_status.config(text=f"🎯 Navigating to target...", fg="blue")
             else:
-                self.navigate_btn.config(text="🎯 NAVIGATE", bg="#27ae60")
+                self.navigate_btn.config(text="🎯 NAVIGATE TO TARGET", bg="#27ae60")
                 if self.controller.state == AGVState.IDLE:
-                    self.nav_status.config(text="Navigation: Ready", fg="green")
+                    self.nav_status.config(text="Navigation: Ready for target", fg="green")
                 elif self.controller.state == AGVState.LINE_FOLLOW:
                     self.nav_status.config(text="Navigation: Line following mode", fg="purple")
             
@@ -698,46 +718,64 @@ class AGVApp(tk.Tk):
             self.lbl_motor2.config(text=f"Motor 2: RPM {rpm2}, Current {cur2:.2f}A")
 
     def update_gui(self):
-        """Main GUI update with preserved functionality"""
+        """OPTIMIZED: Main GUI update with performance optimization"""
         self.gui_update_counter += 1
         
-        # UWB updates
+        # UWB updates every cycle
         if self.controller.uwb_enabled and self.controller.uwb:
             x, y, z = self.controller.get_uwb_position()
             
+            # Calculate heading if we have previous position
+            if hasattr(self, 'last_uwb_pos'):
+                last_x, last_y = self.last_uwb_pos
+                dx = x - last_x
+                dy = y - last_y
+                distance = math.sqrt(dx**2 + dy**2)
+                
+                # Only update heading if we've moved significantly
+                if distance > 0.1:  # 10cm movement
+                    heading = math.degrees(math.atan2(dx, dy))
+                    if heading < 0:
+                        heading += 360
+                    self.agv_heading = heading
+            
+            self.last_uwb_pos = (x, y)
+            
+            # Update position display every cycle
             self.position_label.config(text=f"Position: X={x:.3f}m, Y={y:.3f}m")
             
-            if hasattr(self.controller.uwb, 'adj_grid'):
-                grid_x, grid_y = self.controller.uwb.adj_grid(x, y)
-                if grid_x is not None and grid_y is not None:
-                    self.grid_label.config(text=f"Grid: ({grid_x}, {grid_y})")
+            # Grid position every cycle
+            grid_x = int(x / CELL_SIZE)
+            grid_y = int(y / CELL_SIZE)
+            self.grid_label.config(text=f"Grid: ({grid_x}, {grid_y})")
             
-            # PRESERVED: Update map position with exact same functionality
+            # Update map position (with movement threshold for performance)
             if x > 0 or y > 0:
-                self.update_agv_position(x, y)
+                self.update_agv_position(x, y, self.agv_heading)
         
-        # Heavy operations less frequently
-        if self.gui_update_counter % 3 == 0:
+        # Heavy operations less frequently for better performance
+        if self.gui_update_counter % GUI_HEAVY_UPDATE_INTERVAL == 0:
             self.update_anchor_distances()
             self.update_diagnostics()
         
-        # PRESERVED: Sensor data and status updates
+        # Sensor data every cycle
         self.update_sensor_display()
+        
+        # Status updates every cycle
         self.update_status_display()
         
-        self.after(50, self.update_gui)
+        # Continue optimized updates
+        self.after(GUI_UPDATE_RATE, self.update_gui)
 
-    # =============================================================================
-    # CONTROL FUNCTIONS - PRESERVED and connected to merged controller
-    # =============================================================================
     def bind_keys(self):
         self.bind("<Up>", lambda e: self.on_forward())
         self.bind("<Down>", lambda e: self.on_backward())
         self.bind("<Left>", lambda e: self.on_left())
         self.bind("<Right>", lambda e: self.on_right())
         self.bind("<space>", lambda e: self.on_stop())
-        self.bind("<Return>", lambda e: self.navigate_to_target())
-        self.bind("<Control-g>", lambda e: self.navigate_to_target())
+        # ADDED: Keyboard shortcut for navigation
+        self.bind("<Return>", lambda e: self.navigate_to_target())  # Enter key to navigate
+        self.bind("<Control-g>", lambda e: self.navigate_to_target())  # Ctrl+G to navigate
 
     def start_controller(self):
         self.is_running = True
@@ -778,7 +816,7 @@ class AGVApp(tk.Tk):
         self.command_queue.put(("set_state", AGVState.IDLE))
         self.command_queue.put(("set_speed", (0, 0)))
 
-    def start_line_following(self):
+    def start_task1(self):
         if self.controller.state == AGVState.LINE_FOLLOW:
             self.on_stop()
         else:

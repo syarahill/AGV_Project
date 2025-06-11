@@ -1,0 +1,131 @@
+def DS7():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # AIM 7: Text Analytics
+# 
+# ### Objective:
+# To perform text analytics by applying document preprocessing techniques and generating document representations using Term Frequency (TF) and Inverse Document Frequency (IDF).
+# 
+
+# ## Part A: Document Preprocessing
+# 
+# The following preprocessing steps are applied on a sample document:
+# - Tokenization
+# - POS (Part of Speech) Tagging
+# - Stop Words Removal
+# - Stemming
+# - Lemmatization
+# 
+
+# In[1]:
+
+
+# Import necessary libraries
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+from nltk import pos_tag
+
+# Download necessary NLTK resources (only required once)
+#nltk.download('punkt')
+#nltk.download('stopwords')
+#nltk.download('averaged_perceptron_tagger')
+#nltk.download('wordnet')
+#nltk.download('omw-1.4')
+
+
+# In[2]:
+
+
+# Sample document
+document = "Text analytics is the process of converting unstructured text data into meaningful insights."
+
+# Tokenization
+tokens = word_tokenize(document)
+print("Tokens:", tokens)
+
+
+# In[3]:
+
+
+# POS tagging
+pos_tags = pos_tag(tokens)
+print("POS Tags:", pos_tags)
+
+
+# In[4]:
+
+
+# Remove stopwords
+stop_words = set(stopwords.words('english'))
+filtered_tokens = [i for i in tokens if i.lower() not in stop_words]
+print("Filtered Tokens (Stop Words Removed):", filtered_tokens)
+
+
+# In[5]:
+
+
+# Stemming using PorterStemmer
+stemmed_tokens = [PorterStemmer().stem(word) for word in filtered_tokens]
+print("Stemmed Tokens:", stemmed_tokens)
+
+
+# In[6]:
+
+
+# Lemmatization using WordNetLemmatizer
+lemmatized_tokens = [WordNetLemmatizer().lemmatize(word) for word in filtered_tokens]
+print("Lemmatized Tokens:", lemmatized_tokens)
+
+
+# ## Part B: Document Representation using TF and IDF
+# 
+# We now represent the document numerically using:
+# - Term Frequency (TF)
+# - Inverse Document Frequency (IDF)
+# - TF-IDF (combined score)
+# 
+
+# In[7]:
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Sample documents
+documents = [
+    "Natural language processing is a subfield of artificial intelligence.",
+    "It focuses on the interaction between computers and humans using natural language.",
+    "NLP techniques are widely used in various applications such as sentiment analysis and machine translation.",
+    "Preprocessing is an essential step in NLP.",
+]
+
+# Initialize TF-IDF Vectorizer
+vectorizer = TfidfVectorizer()
+
+# Fit and transform the documents
+tfidf_matrix = vectorizer.fit_transform(documents)
+
+# Get feature names
+feature_names = vectorizer.get_feature_names_out()
+
+# Print the TF-IDF representation
+for i,doc in enumerate(documents):
+    print(f"Document {i+1}:")
+    for j,term in enumerate(feature_names):
+        tfidf_value = tfidf_matrix[i, j]
+        if tfidf_value > 0:
+            print(f"{term}: {tfidf_value:.4f}")
+    print()
+
+
+# In[ ]:
+
+
+
+
+""")
+DS7()

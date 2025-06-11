@@ -1,0 +1,74 @@
+def DS10():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+# Importing necessary libraries
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+# Load the Iris dataset
+
+iris_df = sns.load_dataset('iris')
+print(iris_df.head())
+
+
+# In[2]:
+
+
+# 1. Listing down the features and their types
+print('\nFeatures and their data types:')
+print(iris_df.dtypes)
+
+
+
+# In[18]:
+
+
+# 2. Creating histograms for each feature
+iris_df.hist( color='skyblue', edgecolor='black')
+plt.suptitle('Histograms of Iris Dataset Features')
+plt.show()
+
+
+
+# In[19]:
+
+
+# c. Create a boxplot for each feature in the dataset
+
+sns.boxplot(data=iris_df)
+plt.title('Boxplot of Each Feature in the Iris Dataset')
+plt.tight_layout()
+plt.show()
+
+
+# In[21]:
+
+
+# 4. Identifying outliers based on the boxplots
+print('\nOutliers analysis:')
+columns=iris_df.columns
+for i in columns[:-1]:
+    q1 = iris_df[i].quantile(0.25)
+    q3 = iris_df[i].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    outliers = iris_df[(iris_df[i] < lower_bound) | (iris_df[i] > upper_bound)]
+    print(f'\nOutliers in {i} column:')
+    print(outliers[[i, 'species']])
+
+
+# In[ ]:
+
+
+
+
+""")
+DS10()

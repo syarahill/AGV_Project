@@ -1,0 +1,69 @@
+def b3():
+    print("""
+
+import numpy as np
+
+# Activation functions
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+def sigmoid_derivative(x):
+    return x * (1 - x)
+
+# Training data (binary classification)
+X = np.array([[0, 0],
+              [0, 1],
+              [1, 0],
+              [1, 1]])
+              
+y = np.array([[0],
+              [1],
+              [1],
+              [0]])
+
+# Network architecture
+input_neurons = 2
+hidden_neurons = 3
+output_neurons = 1
+np.random.seed(42)
+
+# Weights and biases initialization
+W1 = np.random.randn(input_neurons, hidden_neurons)
+b1 = np.zeros((1, hidden_neurons))
+W2 = np.random.randn(hidden_neurons, output_neurons)
+b2 = np.zeros((1, output_neurons))
+
+# Training parameters
+epochs = 10000
+learning_rate = 0.1
+
+# Training loop
+for epoch in range(epochs):
+    # Forward pass
+    z1 = np.dot(X, W1) + b1
+    a1 = sigmoid(z1)
+    z2 = np.dot(a1, W2) + b2
+    a2 = sigmoid(z2)
+
+    # Backward pass
+    error = y - a2
+    d_output = error * sigmoid_derivative(a2)
+    
+    error_hidden = d_output.dot(W2.T)
+    d_hidden = error_hidden * sigmoid_derivative(a1)
+
+    # Weight updates
+    W2 += a1.T.dot(d_output) * learning_rate
+    b2 += np.sum(d_output, axis=0, keepdims=True) * learning_rate
+    W1 += X.T.dot(d_hidden) * learning_rate
+    b1 += np.sum(d_hidden, axis=0, keepdims=True) * learning_rate
+
+    # Print loss occasionally
+    if epoch % 1000 == 0:
+        loss = np.mean(np.square(error))
+        print(f"Epoch {epoch}, Loss: {loss:.4f}")
+
+# Final predictions
+print("Final output after training:")
+print(a2.round(3))
+""")
+b3()

@@ -1,0 +1,63 @@
+def b1():
+    print("""
+
+import numpy as np
+
+# Sigmoid and its derivative
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+def sigmoid_derivative(x):
+    return x * (1 - x)
+
+# XOR input and output
+X = np.array([[0,0], [0,1], [1,0], [1,1]])
+y = np.array([[0], [1], [1], [0]])
+
+# Network architecture
+input_neurons = 2
+hidden_neurons = 2
+output_neurons = 1
+np.random.seed(0)
+
+# Initialize weights and biases
+W1 = 2 * np.random.rand(input_neurons, hidden_neurons) - 1
+b1 = np.zeros((1, hidden_neurons))
+W2 = 2 * np.random.rand(hidden_neurons, output_neurons) - 1
+b2 = np.zeros((1, output_neurons))
+
+# Training parameters
+epochs = 10000
+lr = 0.1
+
+# Training loop
+for epoch in range(epochs):
+    # Forward pass
+    z1 = np.dot(X, W1) + b1
+    a1 = sigmoid(z1)
+
+    z2 = np.dot(a1, W2) + b2
+    a2 = sigmoid(z2)
+
+    # Backward pass
+    error = y - a2
+    d_a2 = error * sigmoid_derivative(a2)
+
+    error_hidden = d_a2.dot(W2.T)
+    d_a1 = error_hidden * sigmoid_derivative(a1)
+
+    # Update weights and biases
+    W2 += a1.T.dot(d_a2) * lr
+    b2 += np.sum(d_a2, axis=0, keepdims=True) * lr
+    W1 += X.T.dot(d_a1) * lr
+    b1 += np.sum(d_a1, axis=0, keepdims=True) * lr
+
+    if epoch % 1000 == 0:
+        loss = np.mean(np.square(error))
+        print(f"Epoch {epoch}, Loss: {loss:.4f}")
+
+# Final output
+print("Predictions after training:")
+print(a2.round(3))
+
+""")
+b1()

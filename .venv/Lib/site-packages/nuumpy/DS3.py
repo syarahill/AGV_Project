@@ -1,0 +1,91 @@
+def DS3():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# ## Descriptive Statistics - Measures of Central Tendency and Variability
+# 
+# ## Objective:
+# 1. Provide summary statistics for numeric variables grouped by a categorical variable from an open-source dataset.
+# 2. Perform statistical analysis (percentile, mean, std, etc.) on species in the Iris dataset.
+# 
+
+# ## Step 1: Summary Statistics Grouped by a Categorical Variable
+# 
+# We will use the Titanic dataset and compute statistics (mean, median, min, max, std) for the `Age` column grouped by the `Sex` column.
+# 
+
+# In[7]:
+
+
+import pandas as pd
+
+# Load Titanic dataset
+df = pd.read_csv('https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv')
+
+# Display the first few rows
+df.head()
+
+
+# In[8]:
+
+
+# Drop missing values in Age column
+df = df.dropna(subset=['Age'])
+
+# Group by 'Sex' and compute summary statistics for 'Age'
+summary_stats = df.groupby('Sex')['Age'].agg(['mean', 'median', 'min', 'max', 'std'])
+
+# Display the result
+print("Summary statistics for 'Age' grouped by 'Sex':\n")
+print(summary_stats)
+
+
+# In[3]:
+
+
+# Create a list of age values grouped by sex
+grouped_ages = df.groupby('Sex')['Age'].apply(list)
+
+print("\nList of age values grouped by sex:")
+print(grouped_ages)
+
+
+# ## Step 2: Descriptive Statistics for Iris Dataset by Species (Loaded via Seaborn)
+# 
+# We now use the `seaborn` library to load the Iris dataset and analyze statistical details for each species.
+# 
+
+# In[4]:
+
+
+import seaborn as sns
+
+# Load Iris dataset using seaborn
+iris_df = sns.load_dataset('iris')
+
+# Display the first few rows
+iris_df.head()
+
+
+# In[5]:
+
+
+# Display unique species in the dataset
+print("Species in the dataset:", iris_df['species'].unique())
+
+
+# In[6]:
+
+
+# Loop through each species and show descriptive statistics
+for species in iris_df['species'].unique():
+    print(f"\nDescriptive statistics for {species}:\n")
+    subset = iris_df[iris_df['species'] == species]
+    print(subset.describe(percentiles=[.25, .5, .75]))
+
+""")
+
+
+DS3()

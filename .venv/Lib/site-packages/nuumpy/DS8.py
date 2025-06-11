@@ -1,0 +1,71 @@
+def DS8():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+# In[2]:
+
+
+# Load the Titanic dataset
+df = sns.load_dataset('titanic')
+
+
+# In[3]:
+
+
+# Display the first few rows of the dataset
+print(df.head())
+
+
+# In[4]:
+
+
+# Countplot:
+sns.countplot(x='survived', data=df)
+
+
+# In[5]:
+
+
+# Barplot:
+sns.barplot(x='sex', y='survived', hue='class', data=df)
+
+
+# In[8]:
+
+
+# Heatmap:
+# Select only numeric columns
+df_numeric = df.select_dtypes(include=['float64', 'int64'])
+
+# Create correlation matrix and heatmap
+sns.heatmap(df_numeric.corr(), annot=True, cmap='coolwarm')
+
+
+# Part 2
+
+# In[7]:
+
+
+# Plot histogram of ticket prices
+sns.histplot(data=df, x='fare', kde=True)
+
+# Set plot title and labels
+plt.title('Distribution of Ticket Prices')
+plt.xlabel('Ticket Fare')
+plt.ylabel('Count')
+
+# Display the plot
+plt.show()
+
+""")
+DS8()

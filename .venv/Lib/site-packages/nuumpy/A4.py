@@ -1,0 +1,63 @@
+def a4():
+    print("""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
+# Generate a simple linearly separable dataset
+X = np.array([
+    [2, 3],
+    [1, 1],
+    [2, 1],
+    [3, 1],
+    [6, 5],
+    [7, 7],
+    [8, 6],
+    [7, 5]
+])
+y = np.array([0, 0, 0, 0, 1, 1, 1, 1])  # Labels (2 classes)
+
+# Add bias term to input features
+X_bias = np.hstack((np.ones((X.shape[0], 1)), X))
+
+# Initialize weights randomly
+weights = np.zeros(X_bias.shape[1])
+learning_rate = 0.1
+epochs = 10
+
+# Perceptron Learning Algorithm
+for epoch in range(epochs):
+    for i in range(X_bias.shape[0]):
+        activation = np.dot(X_bias[i], weights)
+        prediction = 1 if activation >= 0 else 0
+        error = y[i] - prediction
+        weights += learning_rate * error * X_bias[i]
+
+print("Trained weights:", weights)
+
+# Plot decision regions
+def plot_decision_boundary(X, y, weights):
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1),
+                         np.arange(y_min, y_max, 0.1))
+    
+    X_grid = np.c_[np.ones((xx.size, 1)), xx.ravel(), yy.ravel()]
+    Z = np.dot(X_grid, weights)
+    Z = np.where(Z >= 0, 1, 0)
+    Z = Z.reshape(xx.shape)
+    
+    cmap = ListedColormap(['#FFBBBB', '#BBFFBB'])
+    plt.contourf(xx, yy, Z, cmap=cmap, alpha=0.6)
+    plt.scatter(X[:, 0], X[:, 1], c=y, edgecolors='k', cmap=ListedColormap(['red', 'green']))
+    plt.title("Perceptron Decision Boundary")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.grid(True)
+    plt.show()
+
+plot_decision_boundary(X, y, weights)
+""")
+    
+a4()

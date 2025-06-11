@@ -1,0 +1,120 @@
+def DS2():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# Data Wrangling II
+# Create an “Academic performance” dataset of students and perform the following operations using Python.
+# 1. Scan all variables for missing values and inconsistencies. If there are missing values and/or inconsistencies, use any of the suitable techniques to deal with them.
+# 2. Scan all numeric variables for outliers. If there are outliers, use any of the suitable techniques to deal with them.
+# 3. Apply data transformations on at least one of the variables. The purpose of this transformation should be one of the following reasons: to change the scale for better understanding of the variable, to convert a non-linear relation into a linear one, or to decrease the skewness and convert the distribution into a normal distribution.
+
+# In[1]:
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+# In[2]:
+
+
+np.random.seed(42)
+data = {
+    'Student_ID':range(1,101),
+    'Math_Score':np.random.randint(40,100,100),
+    'Science_Score':np.random.randint(35,98,100),
+    'English_Score':np.append(np.random.randint(45,95,95),[np.nan]*5),
+}
+df = pd.DataFrame(data)
+
+
+# In[3]:
+
+
+df
+
+
+# In[4]:
+
+
+df.describe()
+
+
+# In[5]:
+
+
+df.isnull().sum()
+
+
+# In[6]:
+
+
+df.info()
+
+
+# In[7]:
+
+
+df.fillna(df.mean(), inplace=True)
+
+
+# In[8]:
+
+
+df
+
+
+# In[9]:
+
+
+def cap_outliers(series):
+    lower_bound, upper_bound = series.quantile([0.05,0.95])
+    return np.clip(series, lower_bound, upper_bound)
+
+df['Math_Score'] = cap_outliers(df['Math_Score'])
+df['Science_Score'] = cap_outliers(df['Science_Score'])
+df['English_Score'] = cap_outliers(df['English_Score'])
+
+
+# In[10]:
+
+
+df
+
+
+# In[11]:
+
+
+df.describe()
+
+
+# In[12]:
+
+
+df['Math_Score'].quantile(0.95)
+
+
+# In[13]:
+
+
+# Log transformation on Math_Score to reduce skewness
+df['Log_Math_Score'] = np.log(df['Math_Score'])
+
+# Optional: check distribution
+
+sns.histplot(df['Math_Score'])
+plt.title("Original Math Score Distribution")
+plt.show()
+
+sns.histplot(df['Log_Math_Score'])
+plt.title("Log-Transformed Math Score Distribution")
+plt.show()
+
+""")
+
+
+DS2()

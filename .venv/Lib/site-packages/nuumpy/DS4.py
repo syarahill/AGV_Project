@@ -1,0 +1,118 @@
+def DS4():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# Boston Housing Linear Regression
+
+# In[1]:
+
+
+# Import essential libraries for data handling, visualization, and modeling
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+
+
+# In[2]:
+
+
+# Load the Boston Housing dataset from CSV file
+data = pd.read_csv('BostonHousing.csv')
+
+# Display the first few rows of the dataset
+print("Dataset preview:")
+print(data.head())
+
+
+# In[3]:
+
+
+# Check for null or missing values in the dataset
+print("\nChecking for null values:")
+print(data.isnull().sum())
+
+
+# In[4]:
+
+
+# Separate features (X) and target variable (y)
+X = data.drop(['MEDV'],axis=1)  # MEDV is the target (house price)
+y = data['MEDV']
+
+
+# In[5]:
+
+
+# Split data into training and testing sets (80% train, 20% test)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+# Create and train a Linear Regression model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Predict house prices using the test set
+y_pred = model.predict(X_test)
+
+
+# In[6]:
+
+
+# Plot a scatter plot to compare actual values (y_test) with predicted values (y_pred)
+plt.scatter(y_test,y_pred)
+
+
+# In[7]:
+
+
+# Calculate evaluation metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Mean Squared Error:", mse)
+print("R-squared:", r2)
+
+
+# In[8]:
+
+
+# Create a DataFrame to compare Actual vs Predicted prices
+comparison_df = pd.DataFrame({
+    'Actual Price': y_test.values,
+    'Predicted Price': y_pred
+})
+
+# Display the first 10 rows
+print("\nActual vs Predicted Prices (first 10):")
+print(comparison_df.head(10))
+
+
+# In[12]:
+
+
+# Plot Actual vs Predicted Prices
+plt.figure(figsize=(10, 6))
+plt.scatter(y_test, y_pred, color='blue')
+plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linewidth=2)
+plt.title('Actual vs Predicted Prices')
+plt.xlabel('Actual Prices')
+plt.ylabel('Predicted Prices')
+plt.show()
+
+
+# In[ ]:
+
+
+
+
+""")
+    
+
+DS4()

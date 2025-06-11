@@ -257,6 +257,23 @@ class AGVApp(tk.Tk):
                                         font=("Arial", 10))
         self.task1_nav_status.pack(pady=2)
 
+        # Add Trajectory Logging buttons
+        traj_frame = ttk.Frame(task_frame)
+        traj_frame.pack(fill="x", padx=10, pady=5)
+
+        self.start_log_btn = tk.Button(traj_frame, text="Start Logging", 
+                                     command=self.start_trajectory_logging,
+                                     bg="#3498db", fg="white", font=("Arial", 9))
+        self.start_log_btn.pack(side="left", padx=5)
+
+        self.stop_log_btn = tk.Button(traj_frame, text="Stop Logging", 
+                                    command=self.stop_trajectory_logging,
+                                    bg="#e74c3c", fg="white", font=("Arial", 9))
+        self.stop_log_btn.pack(side="left", padx=5)
+
+        self.traj_status = tk.Label(traj_frame, text="Logging: OFF", font=("Arial", 9))
+        self.traj_status.pack(side="left", padx=10)
+
         # PID settings
         pid_frame = ttk.Frame(task_frame)
         pid_frame.pack(fill="x", padx=10, pady=5)
@@ -348,6 +365,16 @@ class AGVApp(tk.Tk):
         self.log_text.pack(fill="x", padx=5, pady=5)
         self.log_handler = TextHandler(self.log_text)
         logger.addHandler(self.log_handler)
+
+    def start_trajectory_logging(self):
+        self.command_queue.put(("start_trajectory_logging", None))
+        self.traj_status.config(text="Logging: ON", fg="green")
+        logger.info("Trajectory logging started")
+
+    def stop_trajectory_logging(self):
+        self.command_queue.put(("stop_trajectory_logging", None))
+        self.traj_status.config(text="Logging: OFF", fg="black")
+        logger.info("Trajectory logging stopped")
 
     def create_grid_map(self, parent):
         """OPTIMIZED: Create compact visual grid map (ORIGINAL COORDINATES - CORRECT)"""

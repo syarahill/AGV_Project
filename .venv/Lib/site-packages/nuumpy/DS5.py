@@ -1,0 +1,106 @@
+def DS5():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Data Analytics II - Logistic Regression
+# 
+# **Objective:**
+# 1. Implement logistic regression using Python to classify data in `Social_Network_Ads.csv`.
+# 2. Compute the confusion matrix and evaluate:
+#    - TP, FP, TN, FN
+#    - Accuracy, Error Rate
+#    - Precision, Recall
+# 
+
+# In[1]:
+
+
+# Import required libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
+
+
+# In[2]:
+
+
+# Load dataset
+data = pd.read_csv('Social_Network_Ads.csv')
+print(data.head())
+
+# Select features and target
+X = data[['Age', 'EstimatedSalary']]  # input features
+y = data['Purchased']                 # target label
+
+
+# In[3]:
+
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train logistic regression model
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+
+# Predict the test set results
+y_pred = model.predict(X_test)
+
+
+# In[4]:
+
+
+# Plot a scatter plot to compare actual values (y_test) with predicted values (y_pred)
+plt.scatter(y_test,y_pred)
+
+
+# In[5]:
+
+
+# Get confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+
+# Extract values
+TP = cm[1][1]
+FP = cm[0][1]
+TN = cm[0][0]
+FN = cm[1][0]
+
+# Calculate metrics
+accuracy = (TP + TN) / (TP + TN + FP + FN)
+error_rate = 1 - accuracy
+precision = TP / (TP + FP)
+recall = TP / (TP + FN)
+
+
+# In[6]:
+
+
+# Print results
+print("Confusion Matrix:\n", cm)
+print()
+print("TP:", TP)
+print("FP:", FP)
+print("TN:", TN)
+print("FN:", FN)
+print("Accuracy:", accuracy)
+print("Error Rate:", error_rate)
+print("Precision:", precision)
+print("Recall:", recall)
+
+
+# In[10]:
+
+
+confusion_disp = ConfusionMatrixDisplay(cm)
+confusion_disp.plot()
+
+""")
+    
+
+DS5()

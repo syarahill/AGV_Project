@@ -1,0 +1,56 @@
+def c1():
+    print("""
+
+import tensorflow as tf
+import numpy as np
+
+# Load CIFAR-10 dataset
+(X_train, y_train), (X_test, y_test) = tf.keras.datasets.cifar10.load_data()
+
+# Flatten images (32x32x3 -> 3072)
+X_train = X_train.reshape(X_train.shape[0], -1).astype(np.float32)
+X_test = X_test.reshape(X_test.shape[0], -1).astype(np.float32)
+
+# Binary classification: class 0 (airplane) vs. not airplane
+y_train = (y_train.flatten() == 0).astype(np.float32)
+y_test = (y_test.flatten() == 0).astype(np.float32)
+
+# Normalize inputs (standardization without sklearn)
+mean = np.mean(X_train, axis=0)
+std = np.std(X_train, axis=0) + 1e-7  # Add epsilon to avoid division by zero
+X_train = (X_train - mean) / std
+X_test = (X_test - mean) / std
+
+# Optional: Reduce dataset size for quicker experimentation
+X_train = X_train[:5000]
+y_train = y_train[:5000]
+X_test = X_test[:1000]
+y_test = y_test[:1000]
+
+# Build logistic regression model
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(1, activation='sigmoid', input_shape=(X_train.shape[1],))
+])
+
+# Compile model
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+# Train model
+model.fit(X_train, y_train, epochs=10, batch_size=32, verbose=1)
+
+# Evaluate model
+loss, accuracy = model.evaluate(X_test, y_test, verbose=0)
+print(f"Test Accuracy: {accuracy:.4f}")
+
+# Make predictions
+predictions = (model.predict(X_test) > 0.5).astype(int)
+
+# Show some predictions
+print("Predictions vs Actual:")
+for pred, actual in zip(predictions[:5], y_test[:5]):
+    print(f"Predicted: {pred[0]}, Actual: {int(actual)}")
+
+""")
+c1()

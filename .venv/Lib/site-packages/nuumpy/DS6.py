@@ -1,0 +1,115 @@
+def DS6():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Data Analytics III - Naïve Bayes Classification on Iris Dataset
+# 
+# ## Aim:
+# 1. Implement Simple Naïve Bayes classification algorithm using Python on `iris.csv` dataset.
+# 2. Compute Confusion Matrix and evaluate:
+#    - TP (True Positives)
+#    - FP (False Positives)
+#    - TN (True Negatives)
+#    - FN (False Negatives)
+#    - Accuracy
+#    - Error Rate
+#    - Precision
+#    - Recall
+# 
+
+# In[1]:
+
+
+# Import necessary libraries
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+# In[2]:
+
+
+# Load the iris dataset
+data = pd.read_csv("Iris.csv")
+print(data.head())
+
+# Separate features and target variable
+X = data.drop('Species', axis=1)  # All columns except target
+y = data['Species']               # Target column
+
+
+# In[3]:
+
+
+# Split dataset into 80% training and 20% testing
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Initialize the Naive Bayes classifier
+model = GaussianNB()
+
+# Train the model
+model.fit(X_train, y_train)
+
+# Predict the target on test data
+y_pred = model.predict(X_test)
+
+
+# In[4]:
+
+
+# Plot a scatter plot to compare actual values (y_test) with predicted values (y_pred)
+plt.scatter(y_test,y_pred)
+
+
+# In[5]:
+
+
+# Get confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+
+# Extract values
+TP = cm[1][1]
+FP = cm[0][1]
+TN = cm[0][0]
+FN = cm[1][0]
+
+
+# Calculate metrics
+accuracy = (TP + TN) / (TP + TN + FP + FN)
+error_rate = 1 - accuracy
+precision = TP / (TP + FP)
+recall = TP / (TP + FN)
+
+
+# In[6]:
+
+
+# Print results
+print("Confusion Matrix:\n", cm)
+print()
+print("TP:", TP)
+print("FP:", FP)
+print("TN:", TN)
+print("FN:", FN)
+print("Accuracy:", accuracy)
+print("Error Rate:", error_rate)
+print("Precision:", precision)
+print("Recall:", recall)
+
+
+# In[7]:
+
+
+#Display Confusion Matrix
+
+confusion_disp = ConfusionMatrixDisplay(cm)
+confusion_disp.plot()
+
+""")
+
+DS6()

@@ -1,0 +1,56 @@
+def b4():
+    print("""
+
+import numpy as np
+
+# Convert 0/1 to -1/1
+def bipolar(x):
+    return np.where(x == 0, -1, 1)
+
+# Activation function (sign)
+def sign(x):
+    return np.where(x >= 0, 1, -1)
+
+# Define 4 binary patterns to store (each of length 6 for this example)
+patterns = np.array([
+    [1, 0, 1, 0, 1, 0],
+    [0, 1, 0, 1, 0, 1],
+    [1, 1, 0, 0, 1, 1],
+    [0, 0, 1, 1, 0, 0]
+])
+
+# Convert to bipolar (-1 and 1)
+patterns = bipolar(patterns)
+
+# Initialize weight matrix
+n = patterns.shape[1]
+W = np.zeros((n, n))
+
+# Hebbian learning rule (sum of outer products)
+for p in patterns:
+    W += np.outer(p, p)
+
+# No self-connections
+np.fill_diagonal(W, 0)
+
+print("Weight matrix W:")
+print(W)
+
+# Function to recall a pattern (synchronous update)
+def recall(pattern, W, steps=5):
+    pattern = pattern.copy()
+    for _ in range(steps):
+        pattern = sign(W @ pattern)
+    return pattern
+
+# Test recall with a noisy version of a stored pattern
+test_pattern = patterns[0].copy()
+test_pattern[2] *= -1  # Flip one bit to add noise
+print("\nNoisy input pattern:")
+print(test_pattern)
+
+recalled = recall(test_pattern, W)
+print("Recalled pattern:")
+print(recalled)
+""")
+b4()

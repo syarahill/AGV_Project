@@ -1,0 +1,98 @@
+def a6():
+    print("""
+
+import numpy as np
+from keras.datasets import cifar10
+from keras.utils import to_categorical
+
+# Load CIFAR-10 data
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+# Normalize data and flatten images
+x_train = x_train.reshape(x_train.shape[0], -1) / 255.0
+x_test = x_test.reshape(x_test.shape[0], -1) / 255.0
+
+# One-hot encode labels
+y_train = to_categorical(y_train, num_classes=10)
+y_test = to_categorical(y_test, num_classes=10)
+
+# Reduce dataset size for faster execution
+x_train, y_train = x_train[:10000], y_train[:10000]
+x_test, y_test = x_test[:1000], y_test[:1000]
+
+# Activation functions and derivatives
+def relu(z):
+    return np.maximum(0, z)
+
+def relu_derivative(z):
+    return z > 0
+
+def softmax(z):
+    exp_z = np.exp(z - np.max(z, axis=1, keepdims=True))
+    return exp_z / np.sum(exp_z, axis=1, keepdims=True)
+
+def cross_entropy(preds, labels):
+    return -np.mean(np.sum(labels * np.log(preds + 1e-9), axis=1))
+
+# Initialize parameters
+input_dim = x_train.shape[1]   # 32x32x3 = 3072
+hidden_dim = 100
+output_dim = 10
+learning_rate = 0.01
+epochs = 20
+batch_size = 64
+
+# Weights initialization
+np.random.seed(42)
+W1 = np.random.randn(input_dim, hidden_dim) * 0.01
+b1 = np.zeros((1, hidden_dim))
+W2 = np.random.randn(hidden_dim, output_dim) * 0.01
+b2 = np.zeros((1, output_dim))
+
+# Training loop
+for epoch in range(epochs):
+    permutation = np.random.permutation(x_train.shape[0])
+    x_train_shuffled = x_train[permutation]
+    y_train_shuffled = y_train[permutation]
+
+    for i in range(0, x_train.shape[0], batch_size):
+        x_batch = x_train_shuffled[i:i+batch_size]
+        y_batch = y_train_shuffled[i:i+batch_size]
+
+        # Forward pass
+        z1 = np.dot(x_batch, W1) + b1
+        a1 = relu(z1)
+        z2 = np.dot(a1, W2) + b2
+        a2 = softmax(z2)
+
+        # Loss and backward pass
+        loss = cross_entropy(a2, y_batch)
+        dz2 = a2 - y_batch
+        dW2 = np.dot(a1.T, dz2)
+        db2 = np.sum(dz2, axis=0, keepdims=True)
+
+        dz1 = np.dot(dz2, W2.T) * relu_derivative(z1)
+        dW1 = np.dot(x_batch.T, dz1)
+        db1 = np.sum(dz1, axis=0, keepdims=True)
+
+        # Update weights
+        W2 -= learning_rate * dW2 / batch_size
+        b2 -= learning_rate * db2 / batch_size
+        W1 -= learning_rate * dW1 / batch_size
+        b1 -= learning_rate * db1 / batch_size
+
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {loss:.4f}")
+
+# Prediction
+z1 = np.dot(x_test, W1) + b1
+a1 = relu(z1)
+z2 = np.dot(a1, W2) + b2
+a2 = softmax(z2)
+
+preds = np.argmax(a2, axis=1)
+labels = np.argmax(y_test, axis=1)
+accuracy = np.mean(preds == labels)
+
+print(f"Test Accuracy: {accuracy:.4f}")
+""")
+a6()

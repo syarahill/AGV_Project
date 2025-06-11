@@ -1,0 +1,65 @@
+def a3():
+    print("""
+
+import numpy as np
+
+# Digits 0–9 as characters
+digits = [str(i) for i in range(10)]
+
+# Convert ASCII char to 8-bit binary list
+def ascii_to_binary_vector(ch):
+    ascii_val = ord(ch)
+    binary_str = format(ascii_val, '08b')
+    return [int(bit) for bit in binary_str]
+
+# Prepare dataset
+X = np.array([ascii_to_binary_vector(d) for d in digits])
+y = np.array([0 if int(d) % 2 == 0 else 1 for d in digits])  # 0 = Even, 1 = Odd
+
+# Custom Perceptron implementation
+class Perceptron:
+    def __init__(self, learning_rate=0.1, n_iters=1000):
+        self.lr = learning_rate
+        self.n_iters = n_iters
+        self.activation_func = self._unit_step_func
+        self.weights = None
+        self.bias = None
+
+    def fit(self, X, y):
+        n_samples, n_features = X.shape
+        self.weights = np.zeros(n_features)
+        self.bias = 0
+
+        # Ensure labels are binary (0 or 1)
+        y_ = np.array([1 if i > 0 else 0 for i in y])
+
+        for _ in range(self.n_iters):
+            for idx, x_i in enumerate(X):
+                linear_output = np.dot(x_i, self.weights) + self.bias
+                y_predicted = self.activation_func(linear_output)
+                update = self.lr * (y_[idx] - y_predicted)
+                self.weights += update * x_i
+                self.bias += update
+
+    def predict(self, X):
+        linear_output = np.dot(X, self.weights) + self.bias
+        y_predicted = self.activation_func(linear_output)
+        return y_predicted
+
+    def _unit_step_func(self, x):
+        return np.where(x >= 0, 1, 0)
+
+# Train the perceptron
+perceptron = Perceptron(learning_rate=0.1, n_iters=1000)
+perceptron.fit(X, y)
+
+# Make predictions
+predictions = perceptron.predict(X)
+
+# Show results
+for i, digit in enumerate(digits):
+    pred_label = "Even" if predictions[i] == 0 else "Odd"
+    print(f"Digit: '{digit}' (ASCII {ord(digit)}) -> Predicted: {pred_label}")
+
+""")
+a3()

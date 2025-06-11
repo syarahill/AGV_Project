@@ -1,0 +1,78 @@
+def DS9():
+    print("""
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Data Visualization II
+# 
+# ## Aim
+# Perform the following tasks using the inbuilt Titanic dataset:
+# 
+# 1. **Box Plot for Age Distribution by Gender and Survival Status**
+#    - Use the Titanic dataset (as used in the previous problem).
+#    - Plot a **box plot** to visualize the distribution of **age** with respect to **gender** and **survival status**.
+#    - Columns to use: `'sex'` and `'age'`.
+# 
+# 2. **Write Observations**
+#    - Based on the box plot, write your observations regarding the distribution of age for each gender and survival status.
+#    - Discuss any trends, outliers, or significant patterns you
+# 
+
+# In[1]:
+
+
+# Importing necessary libraries
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+
+# In[2]:
+
+
+# Load the 'titanic' dataset
+titanic_df = sns.load_dataset('titanic')
+print(titanic_df)
+
+# Filter out the necessary columns: 'sex', 'age', and 'survived'
+data = titanic_df[['sex', 'age', 'survived']]
+
+# Remove rows where the 'age' column has missing values
+data = data.dropna(subset=['age'])
+
+
+# In[5]:
+
+
+# Create a box plot to visualize the distribution of age with respect to gender and survival status
+sns.boxplot(x='sex', y='age', hue='survived', data=data)
+
+# Set the plot title and axis labels for clarity
+plt.title('Distribution of Age with respect to Gender and Survival')
+plt.xlabel('Gender')
+plt.ylabel('Age')
+plt.show()
+
+
+# In[6]:
+
+
+# Create a violin plot to visualize the distribution of age with respect to gender and survival status
+sns.violinplot(x='sex', y='age', hue='survived', data=data)
+
+# Set the plot title and axis labels for clarity
+plt.title('Distribution of Age with respect to Gender and Survival')
+plt.xlabel('Gender')
+plt.ylabel('Age')
+plt.show()
+
+
+# In[ ]:
+
+
+
+
+""")
+    
+DS9()

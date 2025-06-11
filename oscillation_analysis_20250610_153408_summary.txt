@@ -1,0 +1,12 @@
+🎯 AGV OSCILLATION ANALYSIS SUMMARY
+==================================================
+
+📊 Total Samples: 67
+🔄 Total Oscillations: 16
+📏 Average Deviation: 0.497 cm
+⬅️  Maximum LEFT Deviation: -1.333 cm
+➡️  Maximum RIGHT Deviation: 1.833 cm
+🔵 LEFT Bias Time: 1.55 seconds
+🔴 RIGHT Bias Time: 1.80 seconds
+⏱️  Total Analysis Time: 24.58 seconds
+📈 Oscillation Rate: 39.1 oscillations/minute

@@ -1,0 +1,28 @@
+
+def a2():
+    print("""
+import numpy as np
+
+def mp_neuron(inputs, weights, threshold):
+    # Compute weighted sum of inputs
+    weighted_sum = np.dot(inputs, weights)
+
+    # Step activation function
+    return 1 if weighted_sum >= threshold else 0
+
+def and_not(x1, x2):
+    # Weights for ANDNOT gate
+    weights = [1, -1]
+    threshold = 1
+    # Input array
+    inputs = np.array([x1, x2])
+    return mp_neuron(inputs, weights, threshold)
+
+# Test all input combinations
+print(and_not(0, 0)) # Expected: 0
+print(and_not(1, 0)) # Expected: 1
+print(and_not(0, 1)) # Expected: 0
+print(and_not(1, 1)) # Expected: 0
+
+""")
+a2()

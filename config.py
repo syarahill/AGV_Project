@@ -30,9 +30,9 @@ INNER_SENSORS = [6, 7, 8, 9, 10, 11]        # Inner sensors for fine detection
 #                      RIGHT SIDE           |           LEFT SIDE
 
 # PID constants for line following - Your optimized values
-INITIAL_PID_KP = 2.0      # Your preferred value
-INITIAL_PID_KI = 0.0      # Your preferred value
-INITIAL_PID_KD = 0.5      # Your preferred value
+INITIAL_PID_KP = 2.0      # Restored from old code
+INITIAL_PID_KI = 0.0      # Restored from old code
+INITIAL_PID_KD = 0.5      # Restored from old code
 
 # Line following parameters
 SETPOINT = 8.5            # Center point between sensors 8 and 9
@@ -40,13 +40,13 @@ IDEAL_CENTER = 8.5        # Ideal center position
 MAX_CORRECTION = 15       # Maximum correction speed
 MIN_CORRECTION = 2        # Minimum correction to apply
 
-# OPTIMIZED Timing and thresholds for better performance
+# RESTORED FROM OLD CODE: Original timing for better line following
 LINE_LOST_TIMEOUT = 0.5   
 MOVING_AVERAGE_WINDOW = 3 
 SENSOR_OFFSET = 0.15      # meters
-MOTOR_UPDATE_RATE = 100   # OPTIMIZED: Increased from 50ms to 100ms for smoother control
-SENSOR_READ_RATE = 50     # OPTIMIZED: Increased from 25ms to 50ms for better performance
-UWB_UPDATE_RATE = 30      # OPTIMIZED: Reduced from 50ms to 30ms for faster updates
+MOTOR_UPDATE_RATE = 50    # RESTORED: Back to 50ms from 100ms
+SENSOR_READ_RATE = 25     # RESTORED: Back to 25ms from 50ms
+UWB_UPDATE_RATE = 30      # Keep optimized UWB rate
 
 # Detection thresholds
 MIN_SENSORS_FOR_LINE = 1  # Minimum sensors needed to detect line

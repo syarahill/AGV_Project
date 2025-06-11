@@ -1,0 +1,88 @@
+def DS1():
+    print("""
+
+Data Wrangling - I
+ Aim
+ Perform the following operations using Python on any open source dataset (e.g., data.csv):
+ 
+ 1. Import all the required Python libraries.
+ 
+ 2. Locate an open source dataset from the web 
+    Example source: [https://www.kaggle.com](https://www.kaggle.com)  
+    - Provide a clear description of the dataset.  
+    - Include the URL of the website.
+ 
+ 3. Load the dataset into a Pandas DataFrame.
+
+ 4. Data Preprocessing  
+    Check for missing values using `isnull()`.  
+    Use `describe()` to get initial statistics.  
+    Provide variable descriptions, types of variables, etc.  
+    Check the dimensions of the DataFrame using `.shape`.
+ 
+ 5. Data Formatting and Normalization 
+    Summarize types of variables by checking their data types using `dtypes`.  
+    Apply type conversions where necessary.
+ 
+ 6. Convert categorical variables into quantitative variables
+    Use encoding methods such as one-hot encoding or label encoding.
+ 
+
+Import required libraries
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+
+df = pd.read_csv("titanic_dataset.csv")
+
+
+df.head()
+
+
+df.info()
+
+df.isnull().sum()
+
+
+
+print("\nStatistical Summary:")
+df.describe()
+
+
+print("\nData Types of Each Column")
+df.dtypes
+
+df['Sex'] = df['Sex'].astype('category')
+df['Embarked'] = df['Embarked'].astype('category')
+
+df.dtypes
+
+
+df['Sex'] = df['Sex'].cat.codes
+
+df.dtypes
+
+
+df.head()
+
+
+df['Embarked'] = df['Embarked'].cat.codes
+
+
+df.dtypes
+
+df.head()
+
+sns.heatmap(df.isnull(), cmap='viridis')
+plt.title('Missing Values Heatmap')
+plt.show()
+
+
+df.head()
+
+""")
+    
+DS1()

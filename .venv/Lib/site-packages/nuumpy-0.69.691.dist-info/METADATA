@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: nuumpy
+Version: 0.69.691
+Summary: INSANE PACKAGE FOR SANE PEOPLE
+Author: Your Name
+Author-email: your@email.com
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.6
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: requires-python
+Dynamic: summary

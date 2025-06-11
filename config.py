@@ -62,8 +62,8 @@ CELL_SIZE = 0.4           # meters per cell (40cm)
 
 # UWB Anchor Positions (CORRECTED)
 UWB_ANCHOR_POSITIONS = {
-    0: (4.0, 0.4, 2.5),   # A0 at grid (10,1)
-    1: (4.0, 6.4, 2.5),   # A1 at grid (10,16)
+    0: (4.0, 6.4, 2.5),   # A0 at grid (10,1)
+    1: (4.0, 0.4, 2.5),   # A1 at grid (10,16)
     2: (0.0, 3.2, 2.5),   # A2 at grid (0,8)
 }
 

@@ -167,8 +167,8 @@ class AGVApp(tk.Tk):
         
         # Create anchor info based on actual positions
         anchor_info = [
-            (f"A0 @Grid(10,1)", "red", (4.0, 0.4)),
-            (f"A1 @Grid(10,16)", "green", (4.0, 6.4)),
+            (f"A0 @Grid(10,16)", "red", (4.0, 6.4)),
+            (f"A1 @Grid(10,0)", "green", (4.0, 0.4)),
             (f"A2 @Grid(0,8)", "blue", (0.0, 3.2))
         ]
         
@@ -427,8 +427,8 @@ class AGVApp(tk.Tk):
         
         # Create anchor markers at CORRECT positions (ORIGINAL WITH Y FLIP - CORRECT)
         anchor_positions = [
-            (10, 1, "A0", "red"),
-            (10, 16, "A1", "green"),
+            (10, 16, "A0", "red"),
+            (10, 1, "A1", "green"),
             (0, 8, "A2", "blue")
         ]
         
@@ -534,7 +534,7 @@ class AGVApp(tk.Tk):
         self.last_agv_pos = (x, y)
         
         # FIXED: Use AGV-specific coordinate conversion (no Y flip)
-        canvas_x, canvas_y = self.agv_real_to_canvas_coords(x, y)
+        canvas_x, canvas_y = self.real_to_canvas_coords(x, y)
         
         # Update AGV marker position
         self.map_canvas.coords(self.agv_marker,

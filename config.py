@@ -131,8 +131,8 @@ UWB_DATA_RATE_LIMIT = 0.02            # Minimum interval between position update
 UWB_BUFFER_SIZE = 1024                # Maximum buffer size for serial data
 
 # Empirical bias correction parameters for UWB X-axis
-UWB_X_BIAS = -0.05   # Constant offset to apply to X coordinate
-UWB_X_SCALE = 1.12   # Scale factor to apply to X coordinate
+UWB_X_BIAS = -0.1   # Constant offset to apply to X coordinate
+UWB_X_SCALE = 1.0   # Scale factor to apply to X coordinate
 
 # Enums for AGV states
 class AGVState(enum.Enum):

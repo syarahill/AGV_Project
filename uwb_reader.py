@@ -257,7 +257,16 @@ class UWBReader:
                 'height_difference': UWB_HEIGHT_DIFFERENCE,
                 'kalman_enabled': UWB_KALMAN_ENABLED
             }
+    def get_anchor_distances(self) -> Dict[int, float]:
+        """Get current 3D distances to anchors"""
+        with self.position_lock:
+            return self.anchor_distances.copy()
 
+    def get_anchor_distances_2d(self) -> Dict[int, float]:
+        """Get current 2D (ground) distances to anchors"""
+        with self.position_lock:
+            return self.anchor_distances_2d.copy()
+        
     def reset_position_filter(self):
         """Reset Kalman filter"""
         if self.kf:

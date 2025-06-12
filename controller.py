@@ -85,6 +85,7 @@ class Controller:
             try:
                 self.uwb = UWBReader(UWB_PORT)
                 if self.uwb.connect():
+                    self.uwb.continuous_read()  # Start continuous reading
                     logger.info("UWB navigation initialized")
                 else:
                     logger.warning("Failed to initialize UWB - continuing without UWB")
@@ -375,7 +376,7 @@ class Controller:
         if not self.uwb:
             return
             
-        self.uwb.continuous_read()
+        # self.uwb.continuous_read()
         
         while self.running and self.uwb:
             try:
@@ -389,11 +390,13 @@ class Controller:
                         
                         self.uwb_position_quality = self.uwb.get_position_quality()
                         
-                        if self.uwb_position_quality and UWB_KALMAN_ENABLED:
+                        if self.uwb_position_quality: # and UWB_KALMAN_ENABLED:
                             raw_pos = self.uwb_position_quality.get('raw_position')
                             filtered_pos = self.uwb_position_quality.get('filtered_position')
                             if raw_pos and filtered_pos:
-                                accuracy = ((raw_pos[0] - filtered_pos[0])**2 + (raw_pos[1] - filtered_pos[1])**2)**0.5
+                                dx = raw_pos[0] - filtered_pos[0]
+                                dy = raw_pos[1] - filtered_pos[1]
+                                accuracy = math.sqrt(dx*dx + dy*dy)
                                 self.position_accuracy_log.append(accuracy)
                 
                 time.sleep(0.03)

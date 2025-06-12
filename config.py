@@ -69,7 +69,7 @@ UWB_ANCHOR_POSITIONS = {
 
 # UWB Height Compensation
 UWB_ANCHOR_HEIGHT = 2.5   # meters - height of anchors above ground
-UWB_AGV_HEIGHT = 0.0      # meters - AGV operates on ground level
+UWB_AGV_HEIGHT = 0.2      # meters - AGV operates on ground level
 UWB_HEIGHT_DIFFERENCE = UWB_ANCHOR_HEIGHT - UWB_AGV_HEIGHT  # 2.5m
 
 # Navigation parameters (UPDATED for better performance)
@@ -81,13 +81,11 @@ LINE_APPROACH_DISTANCE = 0.5  # meters - when to switch to line following
 NAVIGATION_MOVE_SPEED = 15  # RPM for forward movement during navigation (increased from 12)
 NAVIGATION_TURN_SPEED = 10  # RPM for rotation during navigation (increased from 8)
 
-# OPTIMIZED UWB Kalman Filter Parameters (simplified for performance)
+# UWB Kalman Filter Parameters
 UWB_KALMAN_ENABLED = True
-UWB_KALMAN_PROCESS_NOISE_X = 0.1     # Process noise for X axis (E_EST)
-UWB_KALMAN_PROCESS_NOISE_Y = 0.1     # Process noise for Y axis (E_EST)
-UWB_KALMAN_MEASUREMENT_NOISE = 0.2   # OPTIMIZED: Reduced from 0.33 for faster convergence
-UWB_KALMAN_INITIAL_ERROR_X = 1.0     # Initial estimation error X
-UWB_KALMAN_INITIAL_ERROR_Y = 1.0     # Initial estimation error Y
+UWB_KALMAN_DT = 0.05       # Time step in seconds
+UWB_KALMAN_PROCESS_NOISE = 0.1  # Process noise (variance of acceleration)
+UWB_KALMAN_MEASUREMENT_NOISE = 0.05  # Measurement noise (variance of UWB measurements)
 
 # OPTIMIZED UWB Position Validation Parameters (simplified for speed)
 UWB_MAX_VALID_X = ROOM_WIDTH         # Maximum valid X coordinate (4.4m)
@@ -131,6 +129,10 @@ GUI_UPDATE_RATE = 50                  # Base GUI update rate in ms
 # PERFORMANCE OPTIMIZATION: UWB Processing
 UWB_DATA_RATE_LIMIT = 0.02            # Minimum interval between position updates (50Hz max)
 UWB_BUFFER_SIZE = 1024                # Maximum buffer size for serial data
+
+# Empirical bias correction parameters for UWB X-axis
+UWB_X_BIAS = -0.05   # Constant offset to apply to X coordinate
+UWB_X_SCALE = 1.12   # Scale factor to apply to X coordinate
 
 # Enums for AGV states
 class AGVState(enum.Enum):

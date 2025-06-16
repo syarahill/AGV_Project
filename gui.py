@@ -19,21 +19,21 @@ class AGVApp(tk.Tk):
         self.is_running = False
         
         # OPTIMIZED: Grid map variables
-        self.grid_size_x = GRID_SIZE_X  # 11 columns
-        self.grid_size_y = GRID_SIZE_Y  # 17 rows
-        self.cell_size = 18  # SMALLER: Reduced from 25 to 18 for compact map
+        self.grid_size_x = GRID_SIZE_X
+        self.grid_size_y = GRID_SIZE_Y
+        self.cell_size = 18
         self.agv_marker = None
         self.target_marker = None
         self.anchor_markers = {}
-        self.path_lines = []  # For path visualization
+        self.path_lines = [] 
         self.grid_cells = {}
         
         # PERFORMANCE: GUI optimization variables
         self.gui_update_counter = 0
         self.last_agv_pos = (0, 0)
         self.position_update_threshold = GUI_POSITION_UPDATE_THRESHOLD
-        self.agv_heading = 0  # Track AGV heading for direction arrow
-        self.last_uwb_pos = (0, 0)  # Store last position for heading calculation
+        self.agv_heading = 0
+        self.last_uwb_pos = (0, 0)
 
         # GUI setup
         self.setup_gui()
@@ -41,7 +41,7 @@ class AGVApp(tk.Tk):
         self.bind_keys()
         
         self.start_controller()
-        self.after(GUI_UPDATE_RATE, self.update_gui)  # Start optimized updates
+        self.after(GUI_UPDATE_RATE, self.update_gui)
 
     def setup_gui(self):
         main_pane = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
@@ -490,7 +490,7 @@ class AGVApp(tk.Tk):
         grid_y = real_y / CELL_SIZE
         
         canvas_x = grid_x * self.cell_size + 15
-        canvas_y = grid_y * self.cell_size + 15  # NO Y FLIP for AGV position
+        canvas_y = (self.grid_size_y - 1 - grid_y) * self.cell_size + 15  # Corrected Y flip
         
         return canvas_x, canvas_y
 
@@ -534,7 +534,7 @@ class AGVApp(tk.Tk):
         self.last_agv_pos = (x, y)
         
         # FIXED: Use AGV-specific coordinate conversion (no Y flip)
-        canvas_x, canvas_y = self.real_to_canvas_coords(x, y)
+        canvas_x, canvas_y = self.agv_real_to_canvas_coords(x, y)
         
         # Update AGV marker position
         self.map_canvas.coords(self.agv_marker,
@@ -593,7 +593,7 @@ class AGVApp(tk.Tk):
         self.update_target_position(real_x, real_y)
 
     def navigate_to_target(self):
-        """ENHANCED: Navigate to target position using fast UWB"""
+        """Navigate to target position using fast UWB"""
         if not self.controller.uwb_enabled:
             messagebox.showwarning("UWB Not Available", 
                                   "UWB navigation is not available. Check UWB connection and try again.")
@@ -711,16 +711,16 @@ class AGVApp(tk.Tk):
             self.status_var.set(f"State: {self.controller.state.name}")
             
             if self.controller.state == AGVState.LINE_FOLLOW:
-                self.task1_status.config(text=f"Line Following: Active (Error: {self.controller.pid_error:.3f})")
+                self.task1_status.config(text=f"Line Following: Active (Error: {self.controller.line_following.pid_error:.3f})")
                 self.task1_btn.config(text="Stop Line Following", bg="#e74c3c")
             else:
                 self.task1_status.config(text="Line Following: Stopped")
                 self.task1_btn.config(text="Start Line Following", bg="#1ABC9C")
             
-            self.task1_error.config(text=f"PID Error: {self.controller.pid_error:.3f}")
+            self.task1_error.config(text=f"PID Error: {self.controller.line_following.pid_error:.3f}")
             
             # Update Task 1 Navigation status
-            if self.controller.state == AGVState.TASK1_NAVIGATION:
+            if self.controller.state == AGVState.UWB_NAVIGATION:
                 self.task1_nav_btn.config(text="🔄 Task 1 Running...", bg="#e67e22")
                 self.task1_nav_status.config(text=f"Task 1: Navigating to grid {TASK1_TARGET_GRID}")
             else:

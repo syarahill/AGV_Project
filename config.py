@@ -1,4 +1,5 @@
 import enum
+import math
 
 # Serial ports
 WHEEL_PORT = "COM3"  # Motor controller port
@@ -74,7 +75,7 @@ UWB_HEIGHT_DIFFERENCE = UWB_ANCHOR_HEIGHT - UWB_AGV_HEIGHT  # 2.5m
 
 # Navigation parameters (UPDATED for better performance)
 TARGET_THRESHOLD = 0.1    # meters - how close to target before stopping (reduced from 0.15)
-ROTATION_THRESHOLD = 5.0  # degrees - rotation accuracy (increased from 3.0)
+ROTATION_THRESHOLD = 15.0  # degrees - rotation accuracy (increased from 3.0)
 LINE_APPROACH_DISTANCE = 0.5  # meters - when to switch to line following
 
 # Movement speeds for navigation
@@ -107,8 +108,12 @@ TRILATERATION_MAX_ERROR = 10.0       # OPTIMIZED: Increased tolerance from 5.0
 GRID_MOVEMENT_SPEED = 15     # RPM for grid movement
 GRID_TURN_SPEED = 10         # RPM for turning
 GRID_POSITION_THRESHOLD = 0.25  # Grid position accuracy (meters)
-GRID_TURN_TIMEOUT = 3.0      # Maximum time for a turn (seconds)
+GRID_TURN_TIMEOUT = 5.0      # Maximum time for a turn (seconds)
 GRID_MOVE_TIMEOUT = 10.0     # Maximum time for a move (seconds)
+
+# NEW: Open-loop navigation parameters
+OPEN_LOOP_LINEAR_SPEED = 0.2  # m/s, measured forward speed at NAVIGATION_MOVE_SPEED RPM
+OPEN_LOOP_TURN_TIME_90 = 2.0  # seconds to turn 90 degrees at NAVIGATION_TURN_SPEED RPM
 
 # NEW: Task 1 Parameters  
 TASK1_TARGET_GRID = (6, 10)  # Target grid position for Task 1
@@ -133,6 +138,16 @@ UWB_BUFFER_SIZE = 1024                # Maximum buffer size for serial data
 # Empirical bias correction parameters for UWB X-axis
 UWB_X_BIAS = -0.1   # Constant offset to apply to X coordinate
 UWB_X_SCALE = 1.0   # Scale factor to apply to X coordinate
+
+# Grid navigation parameters
+GRID_MOVEMENT_MODE = "MANHATTAN"  # X-then-Y movement
+GRID_HEADING_MODE = "DISCRETE"  # Only 0/90/180/270 degree headings
+GRID_SNAP_THRESHOLD = 0.2  # Max drift before re-snap to grid
+
+# Wheel physics parameters
+WHEEL_BASE = 0.26  # Distance between wheel centers (meters)
+WHEEL_DIAMETER = 0.1  # Wheel diameter (meters)
+WHEEL_CIRCUMFERENCE = math.pi * WHEEL_DIAMETER  # 0.314m
 
 # Enums for AGV states
 class AGVState(enum.Enum):

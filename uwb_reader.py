@@ -101,6 +101,8 @@ class UWBReader:
         self.position_lock = threading.Lock()
         self.running = False
         self.last_position_update = 0
+        self.update_count = 0
+        self.error_count = 0
 
     def connect(self) -> bool:
         """Connect to UWB module"""
@@ -182,6 +184,7 @@ class UWBReader:
             return ranges if len(ranges) >= 3 else None
         except Exception as e:
             logger.error(f"Data parsing error: {e}")
+            self.error_count += 1
             return None
 
     def receive_data(self):
@@ -207,6 +210,7 @@ class UWBReader:
                 time.sleep(0.01)
             except Exception as e:
                 logger.error(f"UWB receive error: {e}")
+                self.error_count += 1
                 time.sleep(0.1)
 
     def update_position(self, ranges: Dict[int, float]):
@@ -229,6 +233,7 @@ class UWBReader:
             try:
                 pos_raw = self.trilaterate(self.anchor_distances)
                 self.position_raw = pos_raw
+                self.update_count += 1
                 
                 # Apply Kalman filtering if enabled
                 if self.kf:
@@ -240,6 +245,7 @@ class UWBReader:
                     
             except Exception as e:
                 logger.error(f"Trilateration error: {e}")
+                self.error_count += 1
 
     def get_current_position(self) -> Tuple[float, float, float]:
         """Get current filtered position"""
@@ -257,6 +263,18 @@ class UWBReader:
                 'height_difference': UWB_HEIGHT_DIFFERENCE,
                 'kalman_enabled': UWB_KALMAN_ENABLED
             }
+            
+    def get_diagnostics(self) -> Dict:
+        """Get diagnostic information"""
+        with self.position_lock:
+            return {
+                'update_count': self.update_count,
+                'error_count': self.error_count,
+                'time_since_update': time.time() - self.last_position_update,
+                'position_quality': self.get_position_quality(),
+                'kalman_enabled': UWB_KALMAN_ENABLED
+            }
+
     def get_anchor_distances(self) -> Dict[int, float]:
         """Get current 3D distances to anchors"""
         with self.position_lock:

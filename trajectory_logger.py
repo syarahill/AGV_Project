@@ -19,6 +19,9 @@ class OscillationAnalyzer:
         self.window_size = window_size
         self.rolling_data = deque(maxlen=window_size)
         
+        # ADD THIS LINE - logging active flag
+        self.logging_active = False
+        
         # Sensor configuration (from your config)
         self.SENSOR_COUNT = 16
         self.CENTER_POSITION = 8.5  # Between sensors 8 and 9
@@ -153,6 +156,10 @@ class OscillationAnalyzer:
             raw_sensor_value: Raw 16-bit sensor data
             Other parameters: For compatibility with existing code
         """
+        # Only update if logging is active
+        if not self.logging_active:
+            return
+            
         current_time = time.time() - self.start_time
         
         # If line_position is None, try to calculate from raw sensor data

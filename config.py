@@ -112,7 +112,7 @@ GRID_TURN_TIMEOUT = 5.0      # Maximum time for a turn (seconds)
 GRID_MOVE_TIMEOUT = 10.0     # Maximum time for a move (seconds)
 
 # NEW: Open-loop navigation parameters
-OPEN_LOOP_LINEAR_SPEED = 0.2  # m/s, measured forward speed at NAVIGATION_MOVE_SPEED RPM
+OPEN_LOOP_LINEAR_SPEED = 0.075  # m/s, measured forward speed at NAVIGATION_MOVE_SPEED RPM
 OPEN_LOOP_TURN_TIME_90 = 2.0  # seconds to turn 90 degrees at NAVIGATION_TURN_SPEED RPM
 
 # NEW: Task 1 Parameters  

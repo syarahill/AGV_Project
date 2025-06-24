@@ -243,7 +243,7 @@ class AGVApp(tk.Tk):
                                    font=("Arial", 10))
         self.task1_error.pack(pady=2)
 
-        # NEW: Task 1 - Navigation to Grid (6,10)
+        # ENHANCED: Task 1 - Navigation to Grid (6,10) with detailed status
         separator = ttk.Separator(task_frame, orient='horizontal')
         separator.pack(fill='x', pady=10)
         
@@ -253,9 +253,39 @@ class AGVApp(tk.Tk):
                                       width=25, height=2)
         self.task1_nav_btn.pack(pady=5)
 
-        self.task1_nav_status = tk.Label(task_frame, text="Task 1: Ready", 
-                                        font=("Arial", 10))
+        # Task 1 detailed status frame
+        task1_status_frame = ttk.Frame(task_frame)
+        task1_status_frame.pack(fill="x", padx=10, pady=5)
+        
+        self.task1_nav_status = tk.Label(task1_status_frame, text="Task 1: Ready", 
+                                        font=("Arial", 10, "bold"))
         self.task1_nav_status.pack(pady=2)
+        
+        # Task 1 progress indicators
+        self.task1_progress_frame = ttk.Frame(task1_status_frame)
+        self.task1_progress_frame.pack(fill="x", pady=5)
+        
+        # Progress checkboxes
+        self.task1_nav_complete_var = tk.BooleanVar()
+        self.task1_nav_complete_cb = ttk.Checkbutton(self.task1_progress_frame, 
+                                                     text="Navigation Complete", 
+                                                     variable=self.task1_nav_complete_var,
+                                                     state="disabled")
+        self.task1_nav_complete_cb.pack(side="left", padx=5)
+        
+        self.task1_turn_complete_var = tk.BooleanVar()
+        self.task1_turn_complete_cb = ttk.Checkbutton(self.task1_progress_frame, 
+                                                      text="Left Turn Complete", 
+                                                      variable=self.task1_turn_complete_var,
+                                                      state="disabled")
+        self.task1_turn_complete_cb.pack(side="left", padx=5)
+        
+        self.task1_line_active_var = tk.BooleanVar()
+        self.task1_line_active_cb = ttk.Checkbutton(self.task1_progress_frame, 
+                                                    text="Line Following Active", 
+                                                    variable=self.task1_line_active_var,
+                                                    state="disabled")
+        self.task1_line_active_cb.pack(side="left", padx=5)
 
         # Add Trajectory Logging buttons
         traj_frame = ttk.Frame(task_frame)
@@ -273,6 +303,29 @@ class AGVApp(tk.Tk):
 
         self.traj_status = tk.Label(traj_frame, text="Logging: OFF", font=("Arial", 9))
         self.traj_status.pack(side="left", padx=10)
+
+        # Battery Status Frame
+        battery_frame = ttk.LabelFrame(right_frame, text="🔋 Battery Status")
+        battery_frame.pack(fill="x", padx=5, pady=5)
+        
+        battery_grid = ttk.Frame(battery_frame)
+        battery_grid.pack(fill="x", padx=10, pady=5)
+        
+        ttk.Label(battery_grid, text="Voltage:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky="w")
+        self.battery_voltage_label = ttk.Label(battery_grid, text="0.00 V", font=("Arial", 10))
+        self.battery_voltage_label.grid(row=0, column=1, padx=10, sticky="w")
+        
+        ttk.Label(battery_grid, text="Charge:", font=("Arial", 10, "bold")).grid(row=0, column=2, sticky="w")
+        self.battery_percentage_label = ttk.Label(battery_grid, text="0%", font=("Arial", 10))
+        self.battery_percentage_label.grid(row=0, column=3, padx=10, sticky="w")
+        
+        ttk.Label(battery_grid, text="Status:", font=("Arial", 10, "bold")).grid(row=0, column=4, sticky="w")
+        self.battery_status_label = ttk.Label(battery_grid, text="UNKNOWN", font=("Arial", 10))
+        self.battery_status_label.grid(row=0, column=5, padx=10, sticky="w")
+        
+        # Charging indicator
+        self.charging_indicator = tk.Label(battery_frame, text="⚡", font=("Arial", 20), fg="gray")
+        self.charging_indicator.pack(pady=5)
 
         # PID settings
         pid_frame = ttk.Frame(task_frame)
@@ -636,8 +689,14 @@ class AGVApp(tk.Tk):
                                   "UWB navigation is required for Task 1. Check UWB connection.")
             return
         
+        # Reset progress indicators
+        self.task1_nav_complete_var.set(False)
+        self.task1_turn_complete_var.set(False)
+        self.task1_line_active_var.set(False)
+        
+        # FIXED: Send correct command for Task 1
         self.command_queue.put(("start_task1", None))
-        logger.info("Task 1 navigation started")
+        logger.info("=== TASK 1 STARTED ===")
 
     def reset_uwb_diagnostics(self):
         """Reset UWB diagnostics"""
@@ -705,8 +764,26 @@ class AGVApp(tk.Tk):
         except queue.Empty:
             pass
 
+    def update_battery_display(self):
+        """Update battery status display"""
+        voltage = self.controller.battery_voltage
+        percentage = self.controller.battery_percentage
+        status = self.controller.battery_status
+        
+        self.battery_voltage_label.config(text=f"{voltage:.2f} V")
+        self.battery_percentage_label.config(text=f"{percentage}%")
+        self.battery_status_label.config(text=status)
+        
+        # Update charging indicator
+        if "CHARGING" in status or self.controller.charging_detected:
+            self.charging_indicator.config(fg="gold")
+        elif "FULL" in status or "CHARGED" in status:
+            self.charging_indicator.config(fg="green")
+        else:
+            self.charging_indicator.config(fg="gray")
+
     def update_status_display(self):
-        """OPTIMIZED: Update status display"""
+        """OPTIMIZED: Update status display with Task 1 progress"""
         with self.controller.lock:
             self.status_var.set(f"State: {self.controller.state.name}")
             
@@ -719,14 +796,46 @@ class AGVApp(tk.Tk):
             
             self.task1_error.config(text=f"PID Error: {self.controller.line_following.pid_error:.3f}")
             
-            # Update Task 1 Navigation status
-            if self.controller.state == AGVState.UWB_NAVIGATION:
-                self.task1_nav_btn.config(text="🔄 Task 1 Running...", bg="#e67e22")
-                self.task1_nav_status.config(text=f"Task 1: Navigating to grid {TASK1_TARGET_GRID}")
+            # Update Task 1 Navigation status with enhanced progress tracking
+            if self.controller.state == AGVState.TASK1_NAVIGATION:
+                self.task1_nav_btn.config(text="🔄 Task 1: Navigating...", bg="#e67e22")
+                self.task1_nav_status.config(text=f"Task 1: Moving to grid {TASK1_TARGET_GRID}", fg="blue")
+                
+                # Check if navigation completed
+                if hasattr(self.controller, 'task1_nav_complete') and self.controller.task1_nav_complete:
+                    self.task1_nav_complete_var.set(True)
+                    
+            elif self.controller.state == AGVState.TURNING_LEFT:
+                self.task1_nav_btn.config(text="🔄 Task 1: Turning Left...", bg="#e67e22")
+                self.task1_nav_status.config(text="Task 1: Executing 90° left turn", fg="orange")
+                
+                # Navigation must be complete to be turning
+                self.task1_nav_complete_var.set(True)
+                
+                # Check if turn completed
+                if hasattr(self.controller, 'task1_turn_complete') and self.controller.task1_turn_complete:
+                    self.task1_turn_complete_var.set(True)
+                    
+            elif self.controller.state == AGVState.LINE_FOLLOW:
+                # Check if this is part of Task 1
+                if (hasattr(self.controller, 'task1_nav_complete') and self.controller.task1_nav_complete and
+                    hasattr(self.controller, 'task1_turn_complete') and self.controller.task1_turn_complete):
+                    self.task1_nav_status.config(text="Task 1: Line following active", fg="green")
+                    self.task1_line_active_var.set(True)
+                    self.task1_nav_btn.config(text="✓ Task 1 Complete", bg="#27ae60")
+                    
+            elif self.controller.state == AGVState.CHARGING:
+                # If all Task 1 steps complete and now charging
+                if (hasattr(self.controller, 'task1_nav_complete') and self.controller.task1_nav_complete and
+                    hasattr(self.controller, 'task1_turn_complete') and self.controller.task1_turn_complete):
+                    self.task1_nav_status.config(text="Task 1: Complete - Charging", fg="gold")
+                    self.task1_nav_btn.config(text="✓ Task 1 Finished", bg="#27ae60")
+                    
             else:
-                self.task1_nav_btn.config(text="🎯 Start Task 1 (Go to Grid 6,10)", bg="#9b59b6")
+                # Reset Task 1 button if idle or other state
                 if self.controller.state == AGVState.IDLE:
-                    self.task1_nav_status.config(text="Task 1: Ready")
+                    self.task1_nav_btn.config(text="🎯 Start Task 1 (Go to Grid 6,10)", bg="#9b59b6")
+                    self.task1_nav_status.config(text="Task 1: Ready", fg="black")
             
             # Update navigation button based on state
             if self.controller.state == AGVState.UWB_NAVIGATION:
@@ -787,6 +896,9 @@ class AGVApp(tk.Tk):
         
         # Sensor data every cycle
         self.update_sensor_display()
+        
+        # Battery data every cycle
+        self.update_battery_display()
         
         # Status updates every cycle
         self.update_status_display()

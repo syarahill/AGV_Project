@@ -2,14 +2,16 @@ import enum
 import math
 
 # Serial ports
-WHEEL_PORT = "COM3"  # Motor controller port
-SENSOR_PORT = "COM15"  # Magnetic sensor port
-UWB_PORT = "COM12"  # UWB module port 
+WHEEL_PORT = "COM15"  # Motor controller port
+SENSOR_PORT = "COM12"  # Magnetic sensor port
+UWB_PORT = "COM27"  # UWB module port 
+BATTERY_PORT = "COM29"  # Battery monitor port
 
 # Baudrates
 WHEEL_BAUDRATE = 115200  # Baudrate for motor controller
 SENSOR_BAUDRATE = 9600  # Baudrate for sensor
 UWB_BAUDRATE = 115200  # Baudrate for UWB module
+BATTERY_BAUDRATE = 115200  # Baudrate for battery monitor
 
 # Motor parameters
 MOTOR_ID_LEFT = 1
@@ -26,6 +28,7 @@ LOW_SENSORS = [1, 2, 3, 4, 5, 6, 7, 8]     # RIGHT side sensors (low numbers)
 HIGH_SENSORS = [9, 10, 11, 12, 13, 14, 15, 16]  # LEFT side sensors (high numbers)
 CENTER_SENSORS = [7, 8, 9, 10]              # Center sensors for ideal position
 INNER_SENSORS = [6, 7, 8, 9, 10, 11]        # Inner sensors for fine detection
+END_MARKER_SENSORS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]   # Sensors for end marker detection
 
 # Physical layout: [1][2][3][4][5][6][7][8] | [9][10][11][12][13][14][15][16]
 #                      RIGHT SIDE           |           LEFT SIDE
@@ -52,6 +55,8 @@ UWB_UPDATE_RATE = 30      # Keep optimized UWB rate
 # Detection thresholds
 MIN_SENSORS_FOR_LINE = 1  # Minimum sensors needed to detect line
 MAX_SENSORS_FOR_LINE = 6  # Maximum sensors (if more, might be noise)
+LINE_ACTIVATION_THRESHOLD = 6  # Sensors needed to activate line following
+END_MARKER_THRESHOLD = 6       # Sensors needed to detect end marker
 
 # CORRECTED ROOM AND UWB CONFIGURATION
 # Room Specifications: 11 columns × 17 rows, 40×40cm cells
@@ -75,7 +80,7 @@ UWB_HEIGHT_DIFFERENCE = UWB_ANCHOR_HEIGHT - UWB_AGV_HEIGHT  # 2.5m
 
 # Navigation parameters (UPDATED for better performance)
 TARGET_THRESHOLD = 0.1    # meters - how close to target before stopping (reduced from 0.15)
-ROTATION_THRESHOLD = 15.0  # degrees - rotation accuracy (increased from 3.0)
+ROTATION_THRESHOLD = 15.0   # degrees - rotation accuracy (increased from 3.0)
 LINE_APPROACH_DISTANCE = 0.5  # meters - when to switch to line following
 
 # Movement speeds for navigation
@@ -113,10 +118,11 @@ GRID_MOVE_TIMEOUT = 10.0     # Maximum time for a move (seconds)
 
 # NEW: Open-loop navigation parameters
 OPEN_LOOP_LINEAR_SPEED = 0.075  # m/s, measured forward speed at NAVIGATION_MOVE_SPEED RPM
-OPEN_LOOP_TURN_TIME_90 = 2.0  # seconds to turn 90 degrees at NAVIGATION_TURN_SPEED RPM
+OPEN_LOOP_TURN_TIME_90 = 2.1  # seconds to turn 90 degrees at NAVIGATION_TURN_SPEED RPM
 
 # NEW: Task 1 Parameters  
 TASK1_TARGET_GRID = (6, 10)  # Target grid position for Task 1
+TASK1_LINE_START = (6, 10)   # Start of magnetic line
 
 # Heading Detection Parameters
 HEADING_DETECTION_MIN_DISTANCE = 0.5  # Increased from 0.3 for better accuracy
@@ -125,6 +131,12 @@ HEADING_DETECTION_SPEED = 12          # Speed for heading detection movement
 
 # Grid Movement Parameters (Fallback)
 GRID_MOVEMENT_THRESHOLD = 0.2         # Distance threshold for grid-based movement
+
+# Battery Parameters
+BATTERY_NOMINAL_MIN = 15.6  # V
+BATTERY_NOMINAL_MAX = 18.6  # V
+BATTERY_CHARGING_THRESHOLD = 21.5  # V
+BATTERY_VOLTAGE_JUMP = 3.0  # V
 
 # PERFORMANCE OPTIMIZATION: GUI Update Parameters
 GUI_POSITION_UPDATE_THRESHOLD = 0.05  # Only update GUI if AGV moved 5cm
@@ -159,3 +171,6 @@ class AGVState(enum.Enum):
     LINE_LOST = 5
     UWB_NAVIGATION = 6  # Added for UWB navigation
     TASK1_NAVIGATION = 7  # NEW: Added for Task 1
+    APPROACHING_LINE = 8  # Added for line approach
+    CHARGING = 9  # Added for charging state
+    TURNING_LEFT = 10  # NEW: Added for left turn

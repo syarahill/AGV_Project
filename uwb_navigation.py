@@ -49,6 +49,9 @@ class UWBNavigation:
         self.turn_radius = WHEEL_BASE / 2.0  # For pivot turns
         self.rotation_circumference = 2 * math.pi * self.turn_radius
         self.rotation_speed = NAVIGATION_TURN_SPEED * (WHEEL_CIRCUMFERENCE / 60.0)  # m/s
+        
+        # Navigation completion flag
+        self._navigation_complete = False
 
     def _calculate_turn_time(self, angle):
         """Calculate turn time based on angle and wheel physics"""
@@ -70,14 +73,20 @@ class UWBNavigation:
             logger.error(f"Target ({x}, {y}) outside room bounds")
             return False
         
+        # Reset completion flag
+        self._navigation_complete = False
+        
         # Get initial position and snap to grid
         init_pos = self.uwb_reader.get_current_position()[:2]
         self.current_grid, snapped_pos = self._snap_to_grid(init_pos)
         self.start_position = snapped_pos
         self.last_position = snapped_pos
         
+        logger.info(f"Starting from grid {self.current_grid} (pos: {init_pos[0]:.2f}, {init_pos[1]:.2f})")
+        
         # Convert target to grid coordinates
         self.target_grid, _ = self._snap_to_grid((x, y))
+        logger.info(f"Target grid: {self.target_grid} (pos: {x:.2f}, {y:.2f})")
         
         # Calculate grid steps
         dx = self.target_grid[0] - self.current_grid[0]
@@ -93,18 +102,30 @@ class UWBNavigation:
             self.initial_heading_set = True
         
         # Plan X then Y movement
-        self.legs = [
-            (self.steps_x, 90 if self.dir_x > 0 else 270),  # X movement
-            (self.steps_y, 0 if self.dir_y > 0 else 180)    # Y movement
-        ]
+        self.legs = []
+        if self.steps_x > 0:
+            self.legs.append((self.steps_x, 90 if self.dir_x > 0 else 270))  # X movement
+        if self.steps_y > 0:
+            self.legs.append((self.steps_y, 0 if self.dir_y > 0 else 180))    # Y movement
+        
+        if not self.legs:
+            logger.info("Already at target position!")
+            self._navigation_complete = True
+            self.state = NavigationState.COMPLETE
+            return True
         
         self.state = NavigationState.START
         self.current_leg = 0
-        logger.info(f"Starting grid navigation from {self.current_grid} to {self.target_grid}")
+        logger.info(f"Navigation plan: {len(self.legs)} legs, X steps: {self.steps_x}, Y steps: {self.steps_y}")
         return True
 
     def _start_leg(self, current_time):
         """Start a movement leg"""
+        if self.current_leg >= len(self.legs):
+            logger.error("No more legs to execute!")
+            self.state = NavigationState.ERROR
+            return
+            
         steps, target_heading = self.legs[self.current_leg]
         
         # Calculate turn angle
@@ -129,7 +150,7 @@ class UWBNavigation:
             self.action_start_time = current_time
             self.turn_duration = abs(turn_time)
             self.target_heading_after_turn = target_heading
-            logger.info(f"Turning {abs(turn_angle):.1f}° from {self.current_heading}° to {target_heading}°")
+            logger.info(f"[NAV] Turning {abs(turn_angle):.1f}° from {self.current_heading}° to {target_heading}° (duration: {self.turn_duration:.2f}s)")
 
     def _start_moving(self, current_time, steps):
         """Start moving forward for given steps"""
@@ -141,7 +162,8 @@ class UWBNavigation:
         
         # Calculate move duration for grid cell
         move_direction_name = "X" if self.move_direction in [90, 270] else "Y"
-        logger.info(f"Moving {move_direction_name} for {steps} cells")
+        total_duration = steps * self.move_duration_per_cell
+        logger.info(f"[NAV] Moving {move_direction_name} for {steps} cells (duration: {total_duration:.2f}s)")
 
     def _update_heading(self, current_time, current_x, current_y):
         """Discrete heading update - no continuous recalculation"""
@@ -150,16 +172,24 @@ class UWBNavigation:
 
     def update(self, current_time):
         """Update navigation state machine for grid movement"""
+        # Return current state for debugging
+        if self.state == NavigationState.COMPLETE:
+            return True  # Navigation is complete
+            
         if self.state == NavigationState.START:
             self._start_leg(current_time)
+            return False  # Not complete yet
             
         elif self.state == NavigationState.TURNING:
             if current_time - self.action_start_time >= self.turn_duration:
                 # Turn complete
+                logger.info(f"[NAV] Turn complete")
                 self.motor_control.emergency_stop()
+                time.sleep(0.05)  # Brief pause
                 self.current_heading = self.target_heading_after_turn
                 steps = self.legs[self.current_leg][0]
                 self._start_moving(current_time, steps)
+            return False  # Not complete yet
                 
         elif self.state == NavigationState.MOVING:
             elapsed = current_time - self.move_start_time
@@ -188,22 +218,35 @@ class UWBNavigation:
                 if self.remaining_steps > 0:
                     # Start next cell
                     self.move_start_time = current_time
-                    logger.debug(f"Moved to cell {self.current_grid}, {self.remaining_steps} steps remaining")
+                    logger.debug(f"[NAV] Moved to cell {self.current_grid}, {self.remaining_steps} steps remaining")
                 else:
                     # Leg complete
+                    logger.info(f"[NAV] Leg {self.current_leg + 1} complete")
                     self.motor_control.emergency_stop()
+                    time.sleep(0.05)  # Brief pause
                     self.current_leg += 1
                     
                     if self.current_leg < len(self.legs):
                         # Start next leg
+                        logger.info(f"[NAV] Starting leg {self.current_leg + 1} of {len(self.legs)}")
                         self.state = NavigationState.START
                     else:
                         # Navigation complete
+                        logger.info(f"[NAV] All legs complete! Final position: grid {self.current_grid}")
                         self.state = NavigationState.COMPLETE
-                        logger.info("Navigation complete - target reached")
-                        return True
-        
-        return None  # Still in progress
+                        self._navigation_complete = True
+                        return True  # Navigation is complete
+            return False  # Not complete yet
+            
+        elif self.state == NavigationState.ERROR:
+            logger.error("Navigation in ERROR state")
+            return False
+            
+        return False  # Default: not complete
+
+    def is_navigation_complete(self):
+        """Check if navigation is complete"""
+        return self._navigation_complete or self.state == NavigationState.COMPLETE
 
     def get_current_position(self) -> tuple:
         """Get current grid-based position"""
@@ -215,11 +258,13 @@ class UWBNavigation:
 
     def apply_motor_commands(self):
         """Apply calculated motor commands"""
-        self.motor_control.send_rpm(MOTOR_ID_LEFT, self.desired_rpm[0])
-        self.motor_control.send_rpm(MOTOR_ID_RIGHT, self.desired_rpm[1])
+        if self.state in [NavigationState.TURNING, NavigationState.MOVING]:
+            self.motor_control.send_rpm(MOTOR_ID_LEFT, self.desired_rpm[0])
+            self.motor_control.send_rpm(MOTOR_ID_RIGHT, self.desired_rpm[1])
 
     def reset(self):
         """Reset navigation state"""
+        logger.info("[NAV] Resetting navigation state")
         self.state = NavigationState.IDLE
         self.target_position = None
         self.start_position = None
@@ -232,3 +277,4 @@ class UWBNavigation:
         self.last_heading_update = time.time()
         self.current_grid = (0, 0)
         self.remaining_steps = 0
+        self._navigation_complete = False

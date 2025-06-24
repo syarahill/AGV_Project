@@ -109,7 +109,7 @@ class LineFollowing:
     def update(self, sensor_data, current_time):
         """Update line following state"""
         if not sensor_data:
-            return
+            return False
             
         median_value, position_value = sensor_data
         line_position, line_found, debug_info = self._calculate_line_position(position_value)

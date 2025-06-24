@@ -9,6 +9,7 @@ from sensor_reader import SensorReader
 from motor_control import MotorControl
 from line_following import LineFollowing
 from uwb_navigation import UWBNavigation
+from battery_checker import BatteryChecker
 
 # Try to import UWB modules
 try:
@@ -76,12 +77,25 @@ class Controller:
         else:
             self.uwb_enabled = False
         
+        # Initialize battery checker
+        self.battery_checker = BatteryChecker(BATTERY_PORT, BATTERY_BAUDRATE)
+        self.battery_voltage = 0.0
+        self.battery_percentage = 0
+        self.battery_status = "UNKNOWN"
+        self.last_battery_voltage = 0.0
+        self.charging_detected = False
+        
         self.command_queue = queue.Queue()
         self.sensor_queue = queue.Queue()
         self.state = AGVState.DISCONNECTED
         self.desired_rpm = [0, 0]
         self.lock = threading.Lock()
         self.running = False
+        self.turn_start_time = 0  # For tracking turn duration
+        
+        # Task 1 specific variables
+        self.task1_nav_complete = False
+        self.task1_turn_complete = False
 
     def start(self):
         self.running = True
@@ -90,6 +104,9 @@ class Controller:
         if self.uwb_enabled and self.uwb:
             threading.Thread(target=self._uwb_loop, daemon=True).start()
             threading.Thread(target=self._uwb_diagnostics_loop, daemon=True).start()
+        
+        # Start battery monitoring
+        self.battery_checker.start()
 
     def stop(self):
         self.running = False
@@ -97,6 +114,7 @@ class Controller:
         self.motor_control.close()
         if self.uwb:
             self.uwb.close()
+        self.battery_checker.stop()
         # Stop trajectory logging if active
         if self.trajectory_logger and self.trajectory_logger.logging_active:
             self.stop_trajectory_logging()
@@ -163,6 +181,22 @@ class Controller:
         if self.state == AGVState.UWB_NAVIGATION and self.uwb_navigation:
             return self.uwb_navigation.get_current_grid()
         return (0, 0)
+    
+    def update_battery_status(self):
+        """Update battery status from checker"""
+        voltage, percentage, status = self.battery_checker.get_data()
+        self.battery_voltage = voltage
+        self.battery_percentage = percentage
+        self.battery_status = status
+        
+        # Detect charging start
+        if self.last_battery_voltage > 0:
+            voltage_jump = voltage - self.last_battery_voltage
+            if voltage_jump >= BATTERY_VOLTAGE_JUMP:
+                self.charging_detected = True
+                logger.info(f"Charging detected! Voltage jump: {voltage_jump:.2f}V")
+        
+        self.last_battery_voltage = voltage
 
     def _sensor_loop(self):
         """Sensor reading loop"""
@@ -200,7 +234,7 @@ class Controller:
                                 dy = raw_pos[1] - filtered_pos[1]
                                 accuracy = math.sqrt(dx*dx + dy*dy)
                                 self.position_accuracy_log.append(accuracy)
-                
+            
                 time.sleep(0.03)
                 
             except Exception as e:
@@ -252,7 +286,7 @@ class Controller:
                     logger.error(f"UWB diagnostics error: {e}")
             
             time.sleep(2)
-
+            
     def navigate_to_position(self, x: float, y: float):
         """Navigate to a specific position using UWB"""
         if not self.uwb_enabled or not self.uwb_navigation:
@@ -264,18 +298,27 @@ class Controller:
         return self.uwb_navigation.navigate_to_position(x, y)
 
     def start_task1(self):
-        """Start Task 1 - Move to grid position (6,10)"""
+        """Start Task 1 - Move to grid position (6,10) and activate line following"""
+        logger.info("=== STARTING TASK 1 ===")
         target_x, target_y = TASK1_TARGET_GRID
         real_x = (target_x + 0.5) * CELL_SIZE
         real_y = (target_y + 0.5) * CELL_SIZE
-        # Set the state to UWB_NAVIGATION explicitly
-        self.state = AGVState.UWB_NAVIGATION
-        return self.navigate_to_position(real_x, real_y)
+        
+        # Reset task 1 flags
+        self.task1_nav_complete = False
+        self.task1_turn_complete = False
+        
+        self.state = AGVState.TASK1_NAVIGATION
+        logger.info(f"Task 1: Navigating to grid {TASK1_TARGET_GRID} (real: {real_x:.2f}, {real_y:.2f})")
+        return self.uwb_navigation.navigate_to_position(real_x, real_y)
 
     def _control_loop(self):
-        """Main control loop"""
+        """Main control loop - FIXED Task 1 flow"""
         while self.running:
             current_time = time.time()
+            
+            # Update battery status
+            self.update_battery_status()
             
             # Process commands
             try:
@@ -306,24 +349,89 @@ class Controller:
                     self.start_trajectory_logging()
                 elif cmd[0] == "stop_trajectory_logging":
                     self.stop_trajectory_logging()
+                elif cmd[0] == "start_charging":
+                    self.state = AGVState.CHARGING
+                    logger.info("Entering charging state")
             except queue.Empty:
                 pass
 
+            # FIXED Task 1 Navigation State Machine
+            if self.state == AGVState.TASK1_NAVIGATION:
+                if self.uwb_navigation:
+                    # Check if navigation is complete
+                    nav_status = self.uwb_navigation.update(current_time)
+                    self.uwb_navigation.apply_motor_commands()
+                    
+                    # Check for completion
+                    if self.uwb_navigation.is_navigation_complete():
+                        if not self.task1_nav_complete:
+                            self.task1_nav_complete = True
+                            logger.info(f"[TASK1] ✓ Arrival at grid {TASK1_TARGET_GRID}")
+                            logger.info("[TASK1] Starting 90° left turn")
+                            self.motor_control.emergency_stop()
+                            time.sleep(0.1)  # Brief pause
+                            self.state = AGVState.TURNING_LEFT
+                            self.turn_start_time = current_time
+                            # Reset navigation for potential reuse
+                            self.uwb_navigation.reset()
+
+            # FIXED Turning left state - CORRECTED WHEEL COMMANDS
+            elif self.state == AGVState.TURNING_LEFT:
+                # Execute in-place left turn (counter-clockwise)
+                self.motor_control.send_rpm(MOTOR_ID_LEFT, -TURN_SPEED)  # Left wheel backward
+                self.motor_control.send_rpm(MOTOR_ID_RIGHT, -TURN_SPEED)   # Right wheel forward
+                
+                # Check turn completion
+                elapsed = current_time - self.turn_start_time
+                if elapsed >= OPEN_LOOP_TURN_TIME_90:
+                    if not self.task1_turn_complete:
+                        self.task1_turn_complete = True
+                        logger.info("[TASK1] ✓ Turn complete (90° left)")
+                        self.motor_control.emergency_stop()
+                        time.sleep(0.1)  # Brief pause
+                        self.line_following.reset()
+                        self.state = AGVState.LINE_FOLLOW
+                        logger.info("[TASK1] Starting line following mode")
+            
+            # Charging state
+            elif self.state == AGVState.CHARGING:
+                # Stop motors
+                self.motor_control.emergency_stop()
+                
+                # Update battery status
+                self.update_battery_status()
+                
+                # Check if charging is complete
+                if self.battery_voltage >= BATTERY_CHARGING_THRESHOLD:
+                    logger.info("Battery fully charged")
+            
             # UWB Navigation
-            if self.state == AGVState.UWB_NAVIGATION and self.uwb_navigation:
+            elif self.state == AGVState.UWB_NAVIGATION and self.uwb_navigation:
                 navigation_result = self.uwb_navigation.update(current_time)
                 self.uwb_navigation.apply_motor_commands()
                 
-                if navigation_result is True:
+                if self.uwb_navigation.is_navigation_complete():
+                    logger.info("Navigation complete")
                     self.state = AGVState.IDLE
-                elif navigation_result is False:
-                    self.state = AGVState.ERROR
+                    self.motor_control.emergency_stop()
 
             # Line following
             elif self.state == AGVState.LINE_FOLLOW:
                 try:
                     sensor_data = self.sensor_queue.get_nowait()
                     line_found = self.line_following.update(sensor_data, current_time)
+                    
+                    # Check for end marker
+                    if line_found:
+                        _, position_value = sensor_data
+                        active_sensors = [i + 1 for i in range(16) if not (position_value & (1 << i))]
+                        end_marker_count = sum(1 for s in active_sensors if s in END_MARKER_SENSORS)
+                        
+                        if end_marker_count >= END_MARKER_THRESHOLD:
+                            logger.info("End marker detected! Stopping and entering charging state")
+                            self.motor_control.emergency_stop()
+                            self.state = AGVState.CHARGING
+                            continue
                     
                     if line_found:
                         # Line detected, apply PID control
@@ -362,4 +470,4 @@ class Controller:
                     self.motor_control.send_rpm(MOTOR_ID_LEFT, self.desired_rpm[0])
                     self.motor_control.send_rpm(MOTOR_ID_RIGHT, self.desired_rpm[1])
                 
-            time.sleep(MOTOR_UPDATE_RATE / 1000.0)  # Back to 50ms
+            time.sleep(MOTOR_UPDATE_RATE / 1000.0)

@@ -17,7 +17,7 @@ BATTERY_BAUDRATE = 115200  # Baudrate for battery monitor
 MOTOR_ID_LEFT = 1
 MOTOR_ID_RIGHT = 2
 MAX_SPEED = 20  # RPM
-TURN_SPEED = 10  # RPM for turning
+TURN_SPEED = 14  # RPM for turning
 
 # Sensor parameters
 SENSOR_ADDRESS = 1  # Modbus address for sensor
@@ -56,7 +56,7 @@ UWB_UPDATE_RATE = 30      # Keep optimized UWB rate
 MIN_SENSORS_FOR_LINE = 1  # Minimum sensors needed to detect line
 MAX_SENSORS_FOR_LINE = 6  # Maximum sensors (if more, might be noise)
 LINE_ACTIVATION_THRESHOLD = 6  # Sensors needed to activate line following
-END_MARKER_THRESHOLD = 6       # Sensors needed to detect end marker
+END_MARKER_THRESHOLD = 16       # Sensors needed to detect end marker
 
 # CORRECTED ROOM AND UWB CONFIGURATION
 # Room Specifications: 11 columns × 17 rows, 40×40cm cells
@@ -85,7 +85,7 @@ LINE_APPROACH_DISTANCE = 0.5  # meters - when to switch to line following
 
 # Movement speeds for navigation
 NAVIGATION_MOVE_SPEED = 15  # RPM for forward movement during navigation (increased from 12)
-NAVIGATION_TURN_SPEED = 10  # RPM for rotation during navigation (increased from 8)
+NAVIGATION_TURN_SPEED = 9  # RPM for rotation during navigation (increased from 8)
 
 # UWB Kalman Filter Parameters
 UWB_KALMAN_ENABLED = True
@@ -117,7 +117,7 @@ GRID_TURN_TIMEOUT = 5.0      # Maximum time for a turn (seconds)
 GRID_MOVE_TIMEOUT = 10.0     # Maximum time for a move (seconds)
 
 # NEW: Open-loop navigation parameters
-OPEN_LOOP_LINEAR_SPEED = 0.075  # m/s, measured forward speed at NAVIGATION_MOVE_SPEED RPM
+OPEN_LOOP_LINEAR_SPEED = 0.08  # m/s, measured forward speed at NAVIGATION_MOVE_SPEED RPM
 OPEN_LOOP_TURN_TIME_90 = 2.1  # seconds to turn 90 degrees at NAVIGATION_TURN_SPEED RPM
 
 # NEW: Task 1 Parameters  

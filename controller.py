@@ -5,6 +5,7 @@ import logging
 import math
 from collections import deque
 from config import *
+from config import WHEEL_BASE, WHEEL_CIRCUMFERENCE
 from sensor_reader import SensorReader
 from motor_control import MotorControl
 from line_following import LineFollowing
@@ -377,13 +378,18 @@ class Controller:
 
             # FIXED Turning left state - CORRECTED WHEEL COMMANDS
             elif self.state == AGVState.TURNING_LEFT:
+                # Calculate turn time based on physics
+                turn_radius = WHEEL_BASE / 2.0
+                arc_length = (90 * math.pi / 180) * turn_radius
+                rotation_speed = TURN_SPEED * (WHEEL_CIRCUMFERENCE / 60.0)
+                turn_time_90 = arc_length / rotation_speed
                 # Execute in-place left turn (counter-clockwise)
                 self.motor_control.send_rpm(MOTOR_ID_LEFT, -TURN_SPEED)  # Left wheel backward
                 self.motor_control.send_rpm(MOTOR_ID_RIGHT, -TURN_SPEED)   # Right wheel forward
                 
                 # Check turn completion
                 elapsed = current_time - self.turn_start_time
-                if elapsed >= OPEN_LOOP_TURN_TIME_90:
+                if elapsed >= turn_time_90:
                     if not self.task1_turn_complete:
                         self.task1_turn_complete = True
                         logger.info("[TASK1] ✓ Turn complete (90° left)")

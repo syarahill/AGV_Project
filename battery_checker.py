@@ -18,6 +18,9 @@ class BatteryChecker:
         self.thread = None
         self.last_voltage = 0.0
         self.charging_detected = False
+        # Add charging detection variables
+        self.charging_start_voltage = 0.0
+        self.charging_start_time = 0.0
 
     def connect(self):
         try:
@@ -93,6 +96,8 @@ class BatteryChecker:
                                     voltage_jump = self.voltage - self.last_voltage
                                     if voltage_jump >= BATTERY_VOLTAGE_JUMP:
                                         self.charging_detected = True
+                                        self.charging_start_voltage = self.voltage
+                                        self.charging_start_time = time.time()
                                         logger.info(f"Charging detected! Voltage jump: {voltage_jump:.2f}V")
                                 
                                 self.last_voltage = self.voltage
@@ -107,6 +112,15 @@ class BatteryChecker:
                 except:
                     pass
                 self.connect()
+    
+    def is_charging_confirmed(self, min_increase=0.02):
+        """Check if voltage has increased by at least min_increase since charging start"""
+        if not self.charging_detected:
+            return False
+            
+        # Calculate voltage increase since charging start
+        voltage_increase = self.voltage - self.charging_start_voltage
+        return voltage_increase >= min_increase
 
     def get_data(self):
         return (self.voltage, self.percentage, self.status)

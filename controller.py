@@ -5,7 +5,7 @@ import logging
 import math
 from collections import deque
 from config import *
-from config import WHEEL_BASE, WHEEL_CIRCUMFERENCE
+from config import WHEEL_BASE, WHEEL_CIRCUMFERENCE, CHARGING_VOLTAGE_JUMP, CHARGING_DETECTION_TIME, CHARGING_VOLTAGE_MIN_INCREASE, CHARGING_RETRY_DURATION, MAX_CHARGING_RETRIES
 from sensor_reader import SensorReader
 from motor_control import MotorControl
 from line_following import LineFollowing
@@ -85,6 +85,11 @@ class Controller:
         self.battery_status = "UNKNOWN"
         self.last_battery_voltage = 0.0
         self.charging_detected = False
+        self.charging_start_voltage = 0.0  # Voltage when charging started
+        
+        # Charging retry variables
+        self.charging_retry_count = 0
+        self.charging_retry_start = 0.0
         
         self.command_queue = queue.Queue()
         self.sensor_queue = queue.Queue()
@@ -352,7 +357,8 @@ class Controller:
                     self.stop_trajectory_logging()
                 elif cmd[0] == "start_charging":
                     self.state = AGVState.CHARGING
-                    logger.info("Entering charging state")
+                    self.charging_start_voltage = self.battery_voltage  # Record starting voltage
+                    logger.info(f"Entering charging state at {self.charging_start_voltage:.2f}V")
             except queue.Empty:
                 pass
 
@@ -404,12 +410,44 @@ class Controller:
                 # Stop motors
                 self.motor_control.emergency_stop()
                 
-                # Update battery status
-                self.update_battery_status()
+                # Initialize charging detection on entry
+                if self.charging_start_voltage == 0:
+                    self.charging_start_voltage = self.battery_voltage
+                    self.charging_retry_start = current_time
+                    logger.info(f"Charging detection started at {self.charging_start_voltage:.2f}V")
                 
-                # Check if charging is complete
-                if self.battery_voltage >= BATTERY_CHARGING_THRESHOLD:
-                    logger.info("Battery fully charged")
+                # Check voltage after CHARGING_DETECTION_TIME seconds
+                elapsed = current_time - self.charging_retry_start
+                if elapsed >= CHARGING_DETECTION_TIME:
+                    voltage_delta = self.battery_voltage - self.charging_start_voltage
+                    
+                    if voltage_delta >= CHARGING_VOLTAGE_MIN_INCREASE:
+                        logger.info(f"Charging confirmed: Voltage increased from {self.charging_start_voltage:.2f}V to {self.battery_voltage:.2f}V (+{voltage_delta:.2f}V)")
+                        # Stay in charging state
+                    else:
+                        if self.charging_retry_count < MAX_CHARGING_RETRIES:
+                            self.charging_retry_count += 1
+                            logger.warning(f"No charging detected (ΔV={voltage_delta:.2f}V). Starting retry #{self.charging_retry_count}")
+                            self.state = AGVState.CHARGING_RETRY
+                            self.charging_retry_start = current_time
+                        else:
+                            logger.error("Not charging after 3 attempts. Halting.")
+                            self.state = AGVState.ERROR
+            
+            # Charging retry state
+            elif self.state == AGVState.CHARGING_RETRY:
+                # Back up for CHARGING_RETRY_DURATION seconds
+                self.motor_control.send_rpm(MOTOR_ID_LEFT, -NAVIGATION_MOVE_SPEED)
+                self.motor_control.send_rpm(MOTOR_ID_RIGHT, NAVIGATION_MOVE_SPEED)
+                
+                # Check if retry duration has elapsed
+                elapsed = current_time - self.charging_retry_start
+                if elapsed >= CHARGING_RETRY_DURATION:
+                    # Reset charging detection and return to line following
+                    self.charging_start_voltage = 0
+                    self.line_following.reset()
+                    self.state = AGVState.LINE_FOLLOW
+                    logger.info("Charging retry complete. Returning to line following.")
             
             # UWB Navigation
             elif self.state == AGVState.UWB_NAVIGATION and self.uwb_navigation:
@@ -437,6 +475,9 @@ class Controller:
                             logger.info("End marker detected! Stopping and entering charging state")
                             self.motor_control.emergency_stop()
                             self.state = AGVState.CHARGING
+                            self.charging_start_voltage = 0  # Reset for new detection
+                            self.charging_retry_count = 0    # Reset retry counter
+                            self.charging_detected = False   # Reset charging flag
                             continue
                     
                     if line_found:

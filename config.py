@@ -2,9 +2,9 @@ import enum
 import math
 
 # Serial ports
-WHEEL_PORT = "COM15"  # Motor controller port
-SENSOR_PORT = "COM12"  # Magnetic sensor port
-UWB_PORT = "COM27"  # UWB module port 
+WHEEL_PORT = "COM8"  # Motor controller port
+SENSOR_PORT = "COM7"  # Magnetic sensor port
+UWB_PORT = "COM11"  # UWB module port 
 BATTERY_PORT = "COM29"  # Battery monitor port
 
 # Baudrates
@@ -136,7 +136,8 @@ GRID_MOVEMENT_THRESHOLD = 0.2         # Distance threshold for grid-based moveme
 BATTERY_NOMINAL_MIN = 15.6  # V
 BATTERY_NOMINAL_MAX = 18.6  # V
 BATTERY_CHARGING_THRESHOLD = 21.5  # V
-BATTERY_VOLTAGE_JUMP = 3.0  # V
+BATTERY_VOLTAGE_JUMP = 0.5  # V
+CHARGING_VOLTAGE_JUMP = 0.5  # Minimum voltage increase to confirm charging
 
 # PERFORMANCE OPTIMIZATION: GUI Update Parameters
 GUI_POSITION_UPDATE_THRESHOLD = 0.05  # Only update GUI if AGV moved 5cm
@@ -161,6 +162,12 @@ WHEEL_BASE = 0.26  # Distance between wheel centers (meters)
 WHEEL_DIAMETER = 0.1  # Wheel diameter (meters)
 WHEEL_CIRCUMFERENCE = math.pi * WHEEL_DIAMETER  # 0.314m
 
+# Charging parameters
+CHARGING_DETECTION_TIME = 5.0  # seconds to monitor voltage
+CHARGING_VOLTAGE_MIN_INCREASE = 0.02  # V minimum increase to confirm charging
+CHARGING_RETRY_DURATION = 8.0  # seconds to back up during retry
+MAX_CHARGING_RETRIES = 3  # Maximum number of charging retry attempts
+
 # Enums for AGV states
 class AGVState(enum.Enum):
     DISCONNECTED = 0
@@ -174,3 +181,4 @@ class AGVState(enum.Enum):
     APPROACHING_LINE = 8  # Added for line approach
     CHARGING = 9  # Added for charging state
     TURNING_LEFT = 10  # NEW: Added for left turn
+    CHARGING_RETRY = 11  # NEW: Added for charging retry

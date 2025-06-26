@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import logging
 import queue
 import math
+import time
 from controller import Controller, AGVState
 from config import *
 
@@ -770,15 +771,23 @@ class AGVApp(tk.Tk):
         percentage = self.controller.battery_percentage
         status = self.controller.battery_status
         
+        # Override status if charging is detected
+        if self.controller.state == AGVState.CHARGING and self.controller.charging_detected:
+            status = "Charging"
+        elif self.controller.state == AGVState.CHARGING_RETRY:
+            status = "Charging Retry"
+        elif self.controller.state == AGVState.ERROR and self.controller.charging_retry_count >= MAX_CHARGING_RETRIES:
+            status = "Not Charging"
+        
         self.battery_voltage_label.config(text=f"{voltage:.2f} V")
         self.battery_percentage_label.config(text=f"{percentage}%")
         self.battery_status_label.config(text=status)
         
         # Update charging indicator
-        if "CHARGING" in status or self.controller.charging_detected:
+        if status == "Charging":
             self.charging_indicator.config(fg="gold")
-        elif "FULL" in status or "CHARGED" in status:
-            self.charging_indicator.config(fg="green")
+        elif status == "Not Charging":
+            self.charging_indicator.config(fg="red")
         else:
             self.charging_indicator.config(fg="gray")
 
@@ -830,7 +839,16 @@ class AGVApp(tk.Tk):
                     hasattr(self.controller, 'task1_turn_complete') and self.controller.task1_turn_complete):
                     self.task1_nav_status.config(text="Task 1: Complete - Charging", fg="gold")
                     self.task1_nav_btn.config(text="✓ Task 1 Finished", bg="#27ae60")
-                    
+            
+            # Add charging retry status
+            elif self.controller.state == AGVState.CHARGING_RETRY:
+                elapsed = time.time() - self.controller.charging_retry_start
+                remaining = max(0, CHARGING_RETRY_DURATION - elapsed)
+                self.task1_nav_status.config(
+                    text=f"Charging retry #{self.controller.charging_retry_count} - {remaining:.1f}s remaining",
+                    fg="orange"
+                )
+            
             else:
                 # Reset Task 1 button if idle or other state
                 if self.controller.state == AGVState.IDLE:
